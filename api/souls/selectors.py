@@ -51,15 +51,31 @@ def list_souls(
 
 def souls_stats(user, filters: Optional[Dict[str, Any]] = None):
     """Get statistics about souls with optional filters."""
+    from django.db.models.functions import TruncMonth
+    from django.db.models import Count
+
     qs = Soul.objects.all()
     if filters:
         qs = SoulFilter(filters, queryset=qs).qs
     total_souls = qs.count()
     personal_won_souls = qs.filter(user=user).count()
 
+    # Monthly breakdown aggregated by date_added
+    souls_by_month = (
+        qs.annotate(month=TruncMonth('date_added'))
+        .values('month')
+        .annotate(count=Count('id'))
+        .order_by('month')
+    )
+    souls_by_month_list = [
+        {"month": entry["month"].strftime("%Y-%m"), "count": entry["count"]}
+        for entry in souls_by_month if entry["month"] is not None
+    ]
+
     return {
         "total_souls": total_souls,
-        "personal_won_souls": personal_won_souls
+        "personal_won_souls": personal_won_souls,
+        "souls_by_month": souls_by_month_list,
     }
 
 def get_progress_update(id: int):

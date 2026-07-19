@@ -9,6 +9,7 @@ from base.api import paginate_response
 from base.schemas import DetailOut
 from base.utils.exceptions import CustomValidationError
 from missions import schemas, services, selectors
+from missions.analytics import system_wide_analytics, per_mission_analytics
 from authentication.decorators import require_permission
 
 
@@ -144,6 +145,43 @@ def mission_category_detail_api(request, category_id: int):
 def delete_mission_category_api(request, category_id: int):
     services.delete_missions_category(user=request.user, category_id=category_id)
     return 204, "Category deleted successfully"
+
+
+@router.get(
+    "/analytics/overview/",
+    response={200: dict, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("view_admin_stats")
+def system_analytics_api(request, year: int = None):
+    """
+    System-wide analytics report.
+
+    Returns cumulative reports for all missions — yearly, half-year, quarterly, monthly.
+    Includes age group breakdowns of souls won per period.
+
+    Query params:
+        - year (optional): Target year. Defaults to current year.
+    """
+    data = system_wide_analytics(year=year)
+    return 200, data
+
+
+@router.get(
+    "/analytics/{mission_id}/",
+    response={200: dict, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("view_mission_report")
+def mission_analytics_api(request, mission_id: int):
+    """
+    Per-mission analytics report.
+
+    Returns daily breakdown and full duration summary for a specific mission.
+    Includes age group breakdowns of souls won per day.
+    """
+    data = per_mission_analytics(mission_id=mission_id)
+    return 200, data
 
 
 @router.get(

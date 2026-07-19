@@ -1,0 +1,1674 @@
+#+TITLE: GIK Missions Backend - API Documentation
+#+AUTHOR: Auto-generated
+#+DATE: 2026-07-14
+#+OPTIONS: toc:3 num:t
+
+* Overview
+
+This document provides a comprehensive reference for all API endpoints in the GIK Missions Backend.
+
+- *Base URL:* =http://127.0.0.1:9050=
+- *API Prefix:* =/api/=
+- *Docs:* =/api/docs= (Swagger UI)
+- *Auth Method:* JWT Bearer Token (=Authorization: Bearer <token>=)
+
+** Roles & Permission Levels
+
+| Role       | Template Name        | Description                                      |
+|------------+----------------------+--------------------------------------------------|
+| Superuser  | superuser_template   | Full access to everything                        |
+| Admin      | admin_template       | Full CRUD + user management + audit logs         |
+| Staff      | staff_template       | Create/update most resources, upload souls       |
+| Exec       | exec_template        | Read-only access to all resources + dashboards   |
+| Missioner  | missioner_template   | Limited CRUD, restricted to own resources        |
+
+** Authentication Flow
+
+All protected endpoints require a valid JWT token in the =Authorization= header.
+Tokens are obtained via =/api/auth/login= or =/api/auth/social=.
+Token lifetime: 7 days (604800 seconds).
+
+-----
+
+
+* Authentication (=/api/auth/=)
+
+** POST =/api/auth/login=
+- *Description:* Email/password login
+- *Auth Required:* No
+- *Access:* Public
+
+*** Request Body (JSON)
+| Field    | Type     | Required | Description        |
+|----------+----------+----------+--------------------|
+| email    | EmailStr | Yes      | User email address |
+| password | str      | Yes      | User password      |
+
+*** Response (200)
+| Field        | Type   | Description                |
+|--------------+--------+----------------------------|
+| access_token | str    | JWT access token           |
+| token_type   | str    | "Bearer"                   |
+| expires_in   | int    | Token lifetime in seconds  |
+| user         | object | UserData object (see below)|
+
+*** Error Responses
+| Code | Description                |
+|------+----------------------------|
+|  401 | Invalid email or password  |
+|  403 | User account is disabled   |
+
+-----
+
+** POST =/api/auth/manual_register=
+- *Description:* Register a new missioner account
+- *Auth Required:* No
+- *Access:* Public
+- *Content-Type:* =multipart/form-data=
+
+*** Request Body (Form)
+| Field              | Type          | Required | Description                     |
+|--------------------+---------------+----------+---------------------------------|
+| email              | EmailStr      | Yes      | User email                      |
+| first_name         | str           | Yes      | First name                      |
+| last_name          | str           | Yes      | Last name                       |
+| password           | str           | Yes      | Password (min 8 chars - Django) |
+| confirm_password   | str           | Yes      | Must match password             |
+| preferred_username | str (optional)| No       | Display name                    |
+| profile_photo      | File          | No       | Profile image upload            |
+
+*** Response (200) - UserData
+| Field         | Type      | Description              |
+|---------------+-----------+--------------------------|
+| id            | int       | User ID                  |
+| email         | EmailStr  | User email               |
+| first_name    | str       | First name               |
+| last_name     | str       | Last name                |
+| display_name  | str       | Preferred/display name   |
+| roles         | list[str] | Role names               |
+| is_superuser  | bool      | Superuser flag           |
+| is_staff      | bool      | Staff flag               |
+| profile_photo | str/null  | Photo URL                |
+
+-----
+
+** POST =/api/auth/social=
+- *Description:* Social authentication (Google/Apple)
+- *Auth Required:* No
+- *Access:* Public
+
+*** Request Body (JSON)
+| Field    | Type        | Required | Description                         |
+|----------+-------------+----------+-------------------------------------|
+| provider | str         | Yes      | "google" or "apple"                 |
+| token    | str (opt)   | No       | OAuth token                         |
+| code     | str (opt)   | No       | Authorization code                  |
+| user     | dict (opt)  | No       | Apple initial auth name data        |
+
+*** Response (200) - SocialAuthResponse
+| Field        | Type   | Description               |
+|--------------+--------+---------------------------|
+| access_token | str    | JWT access token          |
+| token_type   | str    | "Bearer"                  |
+| expires_in   | int    | Token lifetime in seconds |
+| user         | object | UserData object           |
+| is_new_user  | bool   | Whether newly registered  |
+
+-----
+
+** POST =/api/auth/refresh=
+- *Description:* Refresh an access token
+- *Auth Required:* Yes (JWT)
+- *Access:* Any authenticated user
+
+*** Request Body (JSON)
+| Field        | Type | Required | Description             |
+|--------------+------+----------+-------------------------|
+| access_token | str  | Yes      | Current access token    |
+
+*** Response (200) - AuthResponse
+Same as login response.
+
+-----
+
+** GET =/api/auth/verify=
+- *Description:* Verify current token and get user info
+- *Auth Required:* Yes (JWT)
+- *Access:* Any authenticated user
+
+*** Response (200)
+| Field | Type   | Description                     |
+|-------+--------+---------------------------------|
+| valid | bool   | Whether token is valid          |
+| user  | object | UserData with roles (if valid)  |
+
+-----
+
+** GET =/api/auth/providers=
+- *Description:* List available authentication providers
+- *Auth Required:* No
+- *Access:* Public
+
+*** Response (200)
+| Field     | Type | Description                    |
+|-----------+------+--------------------------------|
+| providers | list | List of AuthProviderInfo items |
+
+Each provider item:
+| Field                 | Type     | Description                 |
+|-----------------------+----------+-----------------------------|
+| name                  | str      | Provider identifier         |
+| display_name          | str      | Human-readable name         |
+| supports_registration | bool     | Allows new registrations    |
+| auth_url              | str/null | OAuth authorization URL     |
+| priority              | int      | Display priority            |
+
+-----
+
+
+* Users (=/api/users/=)
+
+** GET =/api/users/=
+- *Description:* List all users (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_users=
+- *Access:* Admin, Superuser
+
+*** Query Parameters
+| Field     | Type      | Required | Description          |
+|-----------+-----------+----------+----------------------|
+| page      | int (>0)  | No       | Page number (def: 1) |
+| page_size | int (>0)  | No       | Items per page       |
+| search    | str       | No       | Search by name/email |
+| roles     | list[str] | No       | Filter by role names |
+| is_active | bool      | No       | Filter active status |
+
+*** Response (200) - Paginated
+| Field     | Type | Description               |
+|-----------+------+---------------------------|
+| count     | int  | Total items               |
+| page      | int  | Current page              |
+| page_size | int  | Items per page            |
+| last_page | int  | Total pages               |
+| data      | list | List of UserData objects  |
+
+-----
+
+** POST =/api/users/create/=
+- *Description:* Create a new user
+- *Auth Required:* Yes (JWT)
+- *Permission:* =add_user=
+- *Access:* Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+*** Request Body (Form)
+| Field              | Type          | Required | Description                          |
+|--------------------+---------------+----------+--------------------------------------|
+| email              | str           | Yes      | User email                           |
+| first_name         | str           | No       | First name                           |
+| last_name          | str           | No       | Last name                            |
+| password           | str           | Yes      | Password                             |
+| profile_photo      | File          | No       | Profile image                        |
+| preferred_username | str           | No       | Display name                         |
+| role_id            | int           | No*      | Existing role ID to assign           |
+| permissions        | list[str]     | No*      | Permissions for new role             |
+| role_name          | str           | No*      | Name for new role (with permissions) |
+| user_type          | enum          | No*      | admin/missioner/staff/exec           |
+
+*Note:* One of =role_id=, =permissions + role_name=, or =user_type= must be provided.
+
+*** Response (201) - UserData
+
+-----
+
+** GET =/api/users/{user_id}/=
+- *Description:* Get user details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_user=
+- *Access:* Admin, Superuser, Staff, Exec; Missioners can only view own profile
+- *Restriction:* Missioners restricted to own =user_id=
+
+*** Response (200) - UserData
+
+-----
+
+** POST =/api/users/activate/{user_id}/=
+- *Description:* Activate a user account
+- *Auth Required:* Yes (JWT)
+- *Permission:* =activate_user=
+- *Access:* Admin, Superuser
+
+*** Response (200) - UserData
+
+-----
+
+** POST =/api/users/deactivate/{user_id}/=
+- *Description:* Deactivate a user account
+- *Auth Required:* Yes (JWT)
+- *Permission:* =deactivate_user=
+- *Access:* Admin, Superuser
+
+*** Response (200) - UserData
+
+-----
+
+** GET =/api/users/roles/=
+- *Description:* List all roles (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_roles=
+- *Access:* Admin, Superuser, Exec
+
+*** Query Parameters
+| Field     | Type     | Required | Description          |
+|-----------+----------+----------+----------------------|
+| page      | int (>0) | No       | Page number          |
+| page_size | int (>0) | No       | Items per page       |
+| name      | str      | No       | Filter by role name  |
+
+*** Response (200) - Paginated list of RoleSchema
+| Field       | Type      | Description           |
+|-------------+-----------+-----------------------|
+| id          | int       | Role ID               |
+| name        | str       | Role name             |
+| description | str       | Role description      |
+| permissions | list[str] | Permission strings    |
+| created_at  | str       | ISO datetime          |
+| updated_at  | str       | ISO datetime          |
+
+-----
+
+** POST =/api/users/roles/create/=
+- *Description:* Create a new role
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_role=
+- *Access:* Admin, Superuser
+
+*** Request Body (JSON)
+| Field       | Type      | Required | Description        |
+|-------------+-----------+----------+--------------------|
+| name        | str       | Yes      | Role name          |
+| description | str       | No       | Role description   |
+| permissions | list[str] | Yes      | Permission strings |
+
+*** Response (200) - RoleOut
+
+-----
+
+** GET =/api/users/roles/{role_id}/=
+- *Description:* Get role details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_role=
+- *Access:* Admin, Superuser, Exec, Missioner, Staff
+
+*** Response (200) - RoleOut
+
+-----
+
+** GET =/api/users/permissions/=
+- *Description:* List available permissions
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_permissions=
+- *Access:* Admin, Superuser
+
+*** Query Parameters
+| Field     | Type | Required | Description                                  |
+|-----------+------+----------+----------------------------------------------|
+| user_type | enum | No       | Filter by role template (admin/missioner/etc)|
+
+*** Response (200) - list[str]
+
+-----
+
+
+* Missions (=/api/missions/=)
+
+** Locations
+
+*** GET =/api/missions/locations/=
+- *Description:* List locations (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_locations=
+- *Access:* All roles (Missioner, Staff, Admin, Exec, Superuser)
+
+**** Query Parameters
+| Field              | Type     | Required | Description             |
+|--------------------+----------+----------+-------------------------|
+| page               | int (>0) | No       | Page number             |
+| page_size          | int (>0) | No       | Items per page          |
+| parent_location_id | int      | No       | Filter by parent        |
+| category           | str      | No       | Filter by category      |
+| search             | str      | No       | Search by name          |
+
+**** Response (200) - Paginated list of LocationOutSchema
+| Field                | Type     | Description             |
+|----------------------+----------+-------------------------|
+| id                   | int      | Location ID             |
+| name                 | str      | Location name           |
+| category             | str      | Location category       |
+| description          | str      | Description             |
+| parent_location_id   | int/null | Parent location ID      |
+| parent_location_name | str/null | Parent location name    |
+| created_at           | str      | ISO datetime            |
+| updated_at           | str      | ISO datetime            |
+
+-----
+
+*** POST =/api/missions/locations/create/=
+- *Description:* Create a new location
+- *Auth Required:* Yes (JWT)
+- *Permission:* =add_location=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON)
+| Field              | Type | Required | Description        |
+|--------------------+------+----------+--------------------|
+| name               | str  | Yes      | Location name      |
+| category           | str  | Yes      | Category           |
+| description        | str  | No       | Description        |
+| parent_location_id | int  | No       | Parent location ID |
+
+**** Response (201) - LocationOutSchema
+
+-----
+
+*** PATCH =/api/missions/locations/{location_id}/update/=
+- *Description:* Update a location
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_location=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON) - all fields optional
+| Field              | Type | Required | Description        |
+|--------------------+------+----------+--------------------|
+| name               | str  | No       | Location name      |
+| category           | str  | No       | Category           |
+| description        | str  | No       | Description        |
+| parent_location_id | int  | No       | Parent location ID |
+
+**** Response (200) - LocationOutSchema
+
+-----
+
+*** GET =/api/missions/locations/{location_id}/=
+- *Description:* Get location details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_location=
+- *Access:* All roles
+
+**** Response (200) - LocationOutSchema
+
+-----
+
+*** DELETE =/api/missions/locations/{location_id}/delete/=
+- *Description:* Delete a location
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_location=
+- *Access:* Admin, Superuser
+
+**** Response (204) - "Location deleted successfully"
+
+-----
+
+** Mission Categories
+
+*** GET =/api/missions/categories/=
+- *Description:* List mission categories (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_mission_categories=
+- *Access:* All roles
+
+**** Query Parameters
+| Field      | Type     | Required | Description               |
+|------------+----------+----------+---------------------------|
+| page       | int (>0) | No       | Page number               |
+| page_size  | int (>0) | No       | Items per page            |
+| search     | str      | No       | Search by name            |
+| event_type | enum     | No       | "one_day" or "week_long"  |
+
+**** Response (200) - Paginated list of MissionCategoryOutSchema
+| Field       | Type     | Description       |
+|-------------+----------+-------------------|
+| id          | int      | Category ID       |
+| name        | str      | Category name     |
+| description | str      | Description       |
+| event_type  | str/null | Event type        |
+| created_at  | str      | ISO datetime      |
+| updated_at  | str      | ISO datetime      |
+
+-----
+
+*** POST =/api/missions/categories/create/=
+- *Description:* Create a mission category
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_mission_category=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON)
+| Field       | Type | Required | Description              |
+|-------------+------+----------+--------------------------|
+| name        | str  | Yes      | Category name            |
+| description | str  | No       | Description              |
+| event_type  | enum | No       | "one_day" or "week_long" |
+
+**** Response (201) - MissionCategoryOutSchema
+
+-----
+
+*** PATCH =/api/missions/categories/{category_id}/update/=
+- *Description:* Update a mission category
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_mission_category=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON) - all optional
+**** Response (200) - MissionCategoryOutSchema
+
+-----
+
+*** GET =/api/missions/categories/{category_id}/=
+- *Description:* Get category details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_mission_category=
+- *Access:* All roles
+
+**** Response (200) - MissionCategoryOutSchema
+
+-----
+
+*** DELETE =/api/missions/categories/{category_id}/delete/=
+- *Description:* Delete a mission category
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_mission_category=
+- *Access:* Admin, Superuser
+
+**** Response (204) - "Category deleted successfully"
+
+-----
+
+** Missions (Core)
+
+*** GET =/api/missions/=
+- *Description:* List missions (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_missions=
+- *Access:* All roles
+
+**** Query Parameters
+| Field                         | Type     | Required | Description                         |
+|-------------------------------+----------+----------+-------------------------------------|
+| page                          | int (>0) | No       | Page number                         |
+| page_size                     | int (>0) | No       | Items per page                      |
+| category_id                   | int      | No       | Filter by category                  |
+| location_id                   | int      | No       | Filter by location                  |
+| status                        | enum     | No       | planning/active/completed/on_hold   |
+| start_date_before             | str      | No       | YYYY-MM-DD                          |
+| start_date_after              | str      | No       | YYYY-MM-DD                          |
+| end_date_before               | str      | No       | YYYY-MM-DD                          |
+| end_date_after                | str      | No       | YYYY-MM-DD                          |
+| search                        | str      | No       | Search by title                     |
+| registration_close_date_before| str      | No       | YYYY-MM-DD                          |
+| registration_close_date_after | str      | No       | YYYY-MM-DD                          |
+
+**** Response (200) - Paginated list of MissionOutSchema
+| Field                     | Type      | Description                    |
+|---------------------------+-----------+--------------------------------|
+| id                        | int       | Mission ID                     |
+| title                     | str       | Mission title                  |
+| description               | str       | Description                    |
+| category_id               | int/null  | Category ID                    |
+| category_name             | str/null  | Category name                  |
+| location_id               | int/null  | Location ID                    |
+| location_name             | str/null  | Location name                  |
+| start_date                | str       | Start date                     |
+| end_date                  | str       | End date                       |
+| status                    | enum      | Mission status                 |
+| partnering_organization   | list[str] | Partner organizations          |
+| event_type                | str/null  | Event type                     |
+| registration_close_date   | date/null | Registration deadline          |
+| registration_fee_required | bool/null | Whether fee required           |
+| registration_fee          | Decimal   | Individual fee                 |
+| couple_registration_fee   | Decimal   | Couple fee                     |
+| is_registration_open      | bool/null | Registration status            |
+| total_souls_won           | str/null  | Total souls count              |
+| total_souls_followup      | str/null  | Follow-up souls count          |
+| banner_image              | str/null  | Banner image URL               |
+| created_at                | str       | ISO datetime                   |
+| updated_at                | str       | ISO datetime                   |
+
+-----
+
+*** POST =/api/missions/create/=
+- *Description:* Create a new mission
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_mission=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form)
+| Field                     | Type      | Required | Description             |
+|---------------------------+-----------+----------+-------------------------|
+| title                     | str       | Yes      | Mission title           |
+| description               | str       | Yes      | Description             |
+| category_id               | int       | Yes      | Category ID             |
+| location_id               | int       | No       | Location ID             |
+| start_date                | date      | Yes      | Start date              |
+| end_date                  | date      | Yes      | End date                |
+| partnering_organization   | list[str] | No       | Partner organizations   |
+| registration_close_date   | date      | No       | Registration deadline   |
+| registration_fee_required | bool      | No       | Default: true           |
+| registration_fee          | Decimal   | No       | Default: 0              |
+| couple_registration_fee   | Decimal   | No       | Default: 0              |
+| banner_image              | File      | No       | Banner image upload     |
+
+**** Response (201) - MissionOutSchema
+
+-----
+
+*** PATCH =/api/missions/{mission_id}/update/=
+- *Description:* Update a mission
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_mission=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form) - all fields optional
+**** Response (200) - MissionOutSchema
+
+-----
+
+*** GET =/api/missions/{mission_id}/=
+- *Description:* Get mission details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_mission=
+- *Access:* All roles
+
+**** Response (200) - MissionOutSchema
+
+-----
+
+*** GET =/api/missions/{mission_id}/public/=
+- *Description:* Get mission details (public-facing, minimal data)
+- *Auth Required:* No
+- *Access:* Public
+
+**** Response (200) - MinimalMissionOutSchema
+Same as MissionOutSchema but without =category_id=, =location_id=, =total_souls_followup=, =banner_image=.
+
+-----
+
+*** DELETE =/api/missions/{mission_id}/delete/=
+- *Description:* Delete a mission
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_mission=
+- *Access:* Admin, Superuser
+
+**** Response (204) - "Mission deleted successfully"
+
+-----
+
+
+** Mission Participants (JIA)
+
+*** GET =/api/missions/{mission_id}/participants/=
+- *Description:* List participants for a mission (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_jia_participants=
+- *Access:* Staff, Admin, Superuser, Exec
+
+**** Query Parameters
+| Field              | Type     | Required | Description                                        |
+|--------------------+----------+----------+----------------------------------------------------|
+| page               | int (>0) | No       | Page number                                        |
+| page_size          | int (>0) | No       | Items per page                                     |
+| start_date         | str      | No       | YYYY-MM-DD                                         |
+| end_date           | str      | No       | YYYY-MM-DD                                         |
+| user_id            | int      | No       | Filter by user                                     |
+| need_facilitation  | bool     | No       | Filter by facilitation need                        |
+| gender             | enum     | No       | "male" or "female"                                 |
+| sort_by            | enum     | No       | created_at/full_name/phone_number/travelling_from  |
+| is_desc            | bool     | No       | Descending sort (default: true)                    |
+
+**** Response (200) - Paginated list of MissionParticipantOutSchema
+| Field               | Type          | Description              |
+|---------------------+---------------+--------------------------|
+| id                  | int           | Participant ID           |
+| mission_id          | int/null      | Mission ID               |
+| mission_title       | str/null      | Mission title            |
+| user_id             | int/null      | Linked user ID           |
+| full_name           | str           | Participant name         |
+| phone_number        | str           | Phone number             |
+| travelling_from     | str           | Origin location          |
+| days_of_attendance  | list[object]  | [{day, day_date}]        |
+| diet_advisory       | str/null      | Dietary requirements     |
+| need_facilitation   | bool          | Needs facilitation       |
+| facilitation_amount | Decimal/null  | Facilitation amount      |
+| coming_as_couple    | bool/null     | Couple registration      |
+| partner_name        | str/null      | Partner name             |
+| gender              | str           | Gender                   |
+| created_at          | str           | ISO datetime             |
+| updated_at          | str           | ISO datetime             |
+
+-----
+
+*** POST =/api/missions/participants/create/=
+- *Description:* Register a mission participant
+- *Auth Required:* No
+- *Access:* Public (registration form)
+
+**** Request Body (JSON)
+| Field               | Type         | Required | Description            |
+|---------------------+--------------+----------+------------------------|
+| mission_id          | int          | Yes      | Mission ID             |
+| user_id             | int          | No       | Linked user ID         |
+| full_name           | str          | No       | Participant name       |
+| phone_number        | str          | No       | Phone number           |
+| travelling_from     | str          | Yes      | Origin location        |
+| days_of_attendance  | list[object] | Yes      | [{day, day_date}]      |
+| diet_advisory       | str          | No       | Dietary requirements   |
+| need_facilitation   | bool         | No       | Default: false         |
+| facilitation_amount | Decimal      | No       | Default: 0             |
+| gender              | enum         | Yes      | "male" or "female"     |
+| coming_as_couple    | bool         | No       | Default: false         |
+| partner_name        | str          | No       | Partner name           |
+
+**** Response (201) - MissionParticipantOutSchema
+
+-----
+
+*** GET =/api/missions/participants/{participant_id}/=
+- *Description:* Get participant details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_jia_participant=
+- *Access:* Staff, Admin, Superuser, Exec, Missioner
+
+**** Response (200) - MissionParticipantOutSchema
+
+-----
+
+*** PATCH =/api/missions/participants/{participant_id}/update/=
+- *Description:* Update a participant
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_jia_participant=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON) - all fields optional
+**** Response (200) - MissionParticipantOutSchema
+
+-----
+
+*** DELETE =/api/missions/participants/{participant_id}/delete/=
+- *Description:* Delete a participant
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_jia_participant=
+- *Access:* Staff, Admin, Superuser
+
+**** Response (204) - "Participant deleted successfully"
+
+-----
+
+** Mission Reports
+
+*** GET =/api/missions/reports/=
+- *Description:* List mission reports (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_mission_reports=
+- *Access:* Staff, Admin, Superuser, Exec
+
+**** Query Parameters
+| Field         | Type     | Required | Description                 |
+|---------------+----------+----------+-----------------------------|
+| page          | int (>0) | No       | Page number                 |
+| page_size     | int (>0) | No       | Items per page              |
+| mission_id    | int      | No       | Filter by mission           |
+| created_by_id | int      | No       | Filter by author            |
+| search        | str      | No       | Search by title/content     |
+| start_date    | str      | No       | YYYY-MM-DD                  |
+| end_date      | str      | No       | YYYY-MM-DD                  |
+| sort_by       | enum     | No       | "created_at" or "title"     |
+| is_desc       | bool     | No       | Descending (default: true)  |
+
+**** Response (200) - Paginated list of ReportOutSchema
+| Field           | Type     | Description        |
+|-----------------+----------+--------------------|
+| id              | int      | Report ID          |
+| mission_id      | int/null | Mission ID         |
+| mission_title   | str/null | Mission title      |
+| title           | str      | Report title       |
+| content         | str      | Report content     |
+| report_file     | str/null | File URL           |
+| created_by_id   | int/null | Author user ID     |
+| created_by_name | str/null | Author name        |
+| created_at      | str      | ISO datetime       |
+| updated_at      | str      | ISO datetime       |
+
+-----
+
+*** POST =/api/missions/reports/create/=
+- *Description:* Create a mission report
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_mission_report=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form)
+| Field         | Type | Required | Description           |
+|---------------+------+----------+-----------------------|
+| mission_id    | int  | Yes      | Mission ID            |
+| title         | str  | Yes      | Report title          |
+| content       | str  | Yes      | Report content        |
+| created_by_id | int  | Yes      | Author user ID        |
+| report_file   | File | Yes      | Report file (upload)  |
+
+**** Response (201) - ReportOutSchema
+
+-----
+
+*** GET =/api/missions/reports/{report_id}/=
+- *Description:* Get report details
+- *Auth Required:* Yes (JWT)
+- *Access:* Any authenticated user
+
+**** Response (200) - ReportOutSchema
+
+-----
+
+*** PATCH =/api/missions/reports/{report_id}/update/=
+- *Description:* Update a report
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_mission_report=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form) - all fields optional
+**** Response (200) - ReportOutSchema
+
+-----
+
+*** DELETE =/api/missions/reports/{report_id}/delete/=
+- *Description:* Delete a report
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_mission_report=
+- *Access:* Staff, Admin, Superuser
+
+**** Response (204) - "Mission report deleted successfully"
+
+-----
+
+** Mission Gallery
+
+*** GET =/api/missions/gallery/images/=
+- *Description:* List gallery images (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_photo_galleries=
+- *Access:* All roles
+
+**** Query Parameters
+| Field          | Type     | Required | Description          |
+|----------------+----------+----------+----------------------|
+| page           | int (>0) | No       | Page number          |
+| page_size      | int (>0) | No       | Items per page       |
+| mission_id     | int      | No       | Filter by mission    |
+| uploaded_by_id | int      | No       | Filter by uploader   |
+| start_date     | str      | No       | YYYY-MM-DD           |
+| end_date       | str      | No       | YYYY-MM-DD           |
+
+**** Response (200) - Paginated list of MissionGalleryOutSchema
+| Field            | Type     | Description          |
+|------------------+----------+----------------------|
+| id               | int      | Image ID             |
+| mission_id       | int/null | Mission ID           |
+| title            | str/null | Image title          |
+| description      | str/null | Image description    |
+| image            | str      | Image URL            |
+| uploaded_by_id   | int/null | Uploader user ID     |
+| uploaded_by_name | str/null | Uploader name        |
+| created_at       | str      | ISO datetime         |
+| updated_at       | str      | ISO datetime         |
+
+-----
+
+*** POST =/api/missions/gallery/images/create/=
+- *Description:* Bulk upload gallery images with metadata
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_photo_gallery=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form)
+| Field          | Type          | Required | Description                              |
+|----------------+---------------+----------+------------------------------------------|
+| mission_id     | int           | Yes      | Mission ID                               |
+| uploaded_by_id | int           | Yes      | Uploader user ID                         |
+| images         | File[] (multi)| Yes      | Image files                              |
+| images_data    | str (JSON)    | Yes      | JSON array of {title, description} items |
+
+*Note:* Number of metadata items must match number of uploaded files.
+
+**** Response (201) - list of MissionGalleryOutSchema
+
+-----
+
+*** GET =/api/missions/gallery/images/{image_id}/=
+- *Description:* Get gallery image details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_photo_gallery=
+- *Access:* All roles
+
+**** Response (200) - MissionGalleryOutSchema
+
+-----
+
+*** DELETE =/api/missions/gallery/images/delete/=
+- *Description:* Bulk delete gallery images
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_photo_gallery=
+- *Access:* Staff, Admin, Superuser
+
+**** Request Body (JSON)
+| Field      | Type      | Required | Description       |
+|------------+-----------+----------+-------------------|
+| mission_id | int       | Yes      | Mission ID        |
+| image_ids  | list[int] | Yes      | IDs to delete     |
+
+**** Response (204) - "{count} Images deleted successfully"
+
+-----
+
+
+** Mission Analytics
+
+*** GET =/api/missions/analytics/overview/=
+- *Description:* System-wide analytics report across all missions
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_admin_stats=
+- *Access:* Admin, Superuser
+
+**** Query Parameters
+| Field | Type | Required | Description                          |
+|-------+------+----------+--------------------------------------|
+| year  | int  | No       | Target year (defaults to current year)|
+
+**** Response (200)
+#+begin_src json
+{
+  "year": 2026,
+  "summary": {
+    "this_month": { "total_souls": 2, "new_converts": 1, "follow_ups": 1, "age_group_breakdown": [...] },
+    "last_3_months": { "total_souls": 5, "new_converts": 4, "follow_ups": 1, "age_group_breakdown": [...] },
+    "last_6_months": { "total_souls": 9, "new_converts": 7, "follow_ups": 2, "age_group_breakdown": [...] },
+    "last_8_months": { "total_souls": 11, "new_converts": 9, "follow_ups": 2, "age_group_breakdown": [...] },
+    "this_year": { "total_souls": 11, "new_converts": 9, "follow_ups": 2, "age_group_breakdown": [...] }
+  },
+  "monthly_breakdown": [
+    {
+      "month": "2026-07",
+      "total": 2,
+      "new_converts": 1,
+      "follow_ups": 1,
+      "age_group_breakdown": [
+        {"age_group": "0-12", "count": 0},
+        {"age_group": "13-17", "count": 0},
+        {"age_group": "18-24", "count": 0},
+        {"age_group": "25-39", "count": 2},
+        {"age_group": "40-59", "count": 0},
+        {"age_group": "60+", "count": 0}
+      ]
+    }
+  ],
+  "missions_summary": {
+    "total": 15,
+    "active": 5,
+    "completed": 8,
+    "planning": 1,
+    "on_hold": 1
+  },
+  "age_group_totals": [
+    {"age_group": "0-12", "count": 0},
+    {"age_group": "13-17", "count": 2},
+    {"age_group": "18-24", "count": 3},
+    {"age_group": "25-39", "count": 4},
+    {"age_group": "40-59", "count": 1},
+    {"age_group": "60+", "count": 1}
+  ]
+}
+#+end_src
+
+**** Response Fields
+| Field              | Type   | Description                                              |
+|--------------------+--------+----------------------------------------------------------|
+| year               | int    | The year the report covers                               |
+| summary            | object | Period-based totals (this_month, 3/6/8 months, year)     |
+| monthly_breakdown  | list   | Per-month souls data with age group breakdowns           |
+| missions_summary   | object | Mission counts by status                                 |
+| age_group_totals   | list   | Overall age distribution for the year                    |
+
+Each period in =summary= contains:
+| Field               | Type | Description                            |
+|---------------------+------+----------------------------------------|
+| total_souls         | int  | Total souls won in the period          |
+| new_converts        | int  | Souls with status "new_convert"        |
+| follow_ups          | int  | Souls with status "follow_up"          |
+| age_group_breakdown | list | [{age_group, count}] for each age band |
+
+Age groups: =0-12=, =13-17=, =18-24=, =25-39=, =40-59=, =60+=
+
+-----
+
+*** GET =/api/missions/analytics/{mission_id}/=
+- *Description:* Per-mission analytics report with daily breakdown
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_mission_report=
+- *Access:* All roles (Missioner, Staff, Admin, Exec, Superuser)
+
+**** Path Parameters
+| Field      | Type | Description |
+|------------+------+-------------|
+| mission_id | int  | Mission ID  |
+
+**** Response (200)
+#+begin_src json
+{
+  "mission": {
+    "id": 2,
+    "title": "Kibera Slums Medical Outreach",
+    "status": "active",
+    "start_date": "2026-08-01",
+    "end_date": "2026-08-07",
+    "location": "Kibera Slums",
+    "category": "Medical Mission",
+    "duration_days": 7
+  },
+  "totals": {
+    "total_souls": 3,
+    "new_converts": 2,
+    "follow_ups": 1,
+    "active": 0
+  },
+  "daily_breakdown": [
+    {
+      "date": "2026-08-03",
+      "total": 2,
+      "new_converts": 1,
+      "follow_ups": 1,
+      "age_group_breakdown": [
+        {"age_group": "0-12", "count": 0},
+        {"age_group": "13-17", "count": 0},
+        {"age_group": "18-24", "count": 1},
+        {"age_group": "25-39", "count": 1},
+        {"age_group": "40-59", "count": 0},
+        {"age_group": "60+", "count": 0}
+      ]
+    }
+  ],
+  "age_group_breakdown": [
+    {"age_group": "0-12", "count": 0},
+    {"age_group": "13-17", "count": 0},
+    {"age_group": "18-24", "count": 1},
+    {"age_group": "25-39", "count": 0},
+    {"age_group": "40-59", "count": 0},
+    {"age_group": "60+", "count": 0}
+  ],
+  "gender_breakdown": [
+    {"gender": "male", "count": 1},
+    {"gender": "female", "count": 2}
+  ]
+}
+#+end_src
+
+**** Response Fields
+| Field              | Type   | Description                                    |
+|--------------------+--------+------------------------------------------------|
+| mission            | object | Mission metadata (title, status, dates, etc.)  |
+| totals             | object | Overall soul counts for the mission            |
+| daily_breakdown    | list   | Per-day data with age group breakdowns         |
+| age_group_breakdown| list   | Overall age distribution for this mission      |
+| gender_breakdown   | list   | Male/female split of souls won                 |
+
+Mission object fields:
+| Field         | Type   | Description                     |
+|---------------+--------+---------------------------------|
+| id            | int    | Mission ID                      |
+| title         | str    | Mission title                   |
+| status        | str    | planning/active/completed/on_hold|
+| start_date    | str    | YYYY-MM-DD                      |
+| end_date      | str    | YYYY-MM-DD                      |
+| location      | str    | Location name                   |
+| category      | str    | Category name                   |
+| duration_days | int    | Total days of the mission       |
+
+-----
+
+* Souls (=/api/souls/=)
+
+** GET =/api/souls/=
+- *Description:* List souls (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_souls=
+- *Access:* All roles (Missioners see own souls only)
+
+*** Query Parameters
+| Field          | Type     | Required | Description                                           |
+|----------------+----------+----------+-------------------------------------------------------|
+| page           | int (>0) | No       | Page number                                           |
+| page_size      | int (>0) | No       | Items per page                                        |
+| is_personal    | bool     | No       | Filter personal souls                                 |
+| mission        | int      | No       | Filter by mission ID                                  |
+| gender         | enum     | No       | Gender filter                                         |
+| age_group      | enum     | No       | Age group filter                                      |
+| location       | int      | No       | Filter by location ID                                 |
+| status         | enum     | No       | new_convert / follow_up / baptized / etc.             |
+| search         | str      | No       | Search by name/phone                                  |
+| created_before | date     | No       | YYYY-MM-DD                                            |
+| created_after  | date     | No       | YYYY-MM-DD                                            |
+| user           | int      | No       | Filter by missioner                                   |
+| sort_by        | enum     | No       | uploaded_at/first_name/phone_number/date_added        |
+| is_desc        | bool     | No       | Descending (default: true)                            |
+
+*** Response (200) - Paginated list of SoulOut
+| Field          | Type     | Description          |
+|----------------+----------+----------------------|
+| id             | int      | Soul ID              |
+| first_name     | str      | First name           |
+| last_name      | str      | Last name            |
+| phone_number   | str      | Phone number         |
+| gender         | str      | Gender               |
+| age_group      | str      | Age group            |
+| location_id    | int/null | Location ID          |
+| location_name  | str/null | Location name        |
+| status         | str      | Soul status          |
+| date_added     | date     | Date added           |
+| mission_id     | int/null | Mission ID           |
+| mission_title  | str/null | Mission title        |
+| is_personal    | bool     | Personal soul flag   |
+| user_id        | int/null | Missioner user ID    |
+| user_full_name | str/null | Missioner name       |
+| soul_full_name | str      | Full name            |
+| description    | str/null | Description          |
+| created_at     | str      | ISO datetime         |
+| updated_at     | str      | ISO datetime         |
+
+-----
+
+** GET =/api/souls/stats/=
+- *Description:* Get souls statistics
+- *Auth Required:* Yes (JWT)
+- *Permission:* =souls_stats=
+- *Access:* Missioner, Staff, Admin, Superuser
+
+*** Query Parameters
+Same as souls list query parameters.
+
+*** Response (200) - dict (stats summary)
+
+-----
+
+** POST =/api/souls/create/=
+- *Description:* Create a new soul
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_soul=
+- *Access:* Missioner, Staff, Admin, Superuser
+
+*** Request Body (JSON)
+| Field        | Type     | Required | Description           |
+|--------------+----------+----------+-----------------------|
+| first_name   | str      | Yes      | First name            |
+| last_name    | str      | Yes      | Last name             |
+| phone_number | str      | Yes      | Phone number          |
+| gender       | enum     | Yes      | Gender type           |
+| age_group    | enum     | Yes      | Age group category    |
+| location     | int      | No       | Location ID           |
+| status       | enum     | Yes      | Soul status           |
+| date_added   | date     | No       | Date added            |
+| mission      | int      | No       | Mission ID            |
+| is_personal  | bool     | No       | Default: false        |
+| user         | int      | No       | Missioner user ID     |
+| description  | str      | No       | Description           |
+
+*** Response (201) - SoulOut
+
+-----
+
+** POST =/api/souls/upload_souls/=
+- *Description:* Bulk upload souls from Excel/CSV file
+- *Auth Required:* Yes (JWT)
+- *Permission:* =upload_souls=
+- *Access:* Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+*** Request Body (Form)
+| Field       | Type | Required | Description             |
+|-------------+------+----------+-------------------------|
+| mission_id  | int  | Yes      | Mission ID              |
+| location_id | int  | Yes      | Location ID             |
+| file        | File | Yes      | Excel/CSV file          |
+
+Expected file columns: missioner_email, first_name, last_name, phone_number, gender, age_group, description, date_added
+
+*** Response (200) - dict (upload result summary)
+
+-----
+
+** PATCH =/api/souls/{soul_id}/update/=
+- *Description:* Update a soul
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_soul=
+- *Access:* Missioner (own), Staff, Admin, Superuser
+
+*** Request Body (JSON) - all fields optional
+*** Response (200) - SoulOut
+
+-----
+
+** DELETE =/api/souls/{soul_id}/delete/=
+- *Description:* Delete a soul
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_soul=
+- *Access:* Admin, Superuser
+
+*** Response (200) - SoulOut
+
+-----
+
+** GET =/api/souls/{soul_id}/=
+- *Description:* Get soul details (with progress updates)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_soul=
+- *Access:* All roles; Missioners restricted to own souls
+- *Restriction:* =missioner_template= restricted via handler
+
+*** Response (200) - SoulDetailsOut
+Extends SoulOut with:
+| Field                   | Type        | Description                     |
+|-------------------------+-------------+---------------------------------|
+| latest_progress_update  | object/null | Most recent progress update     |
+| initial_progress_update | object/null | Earliest progress update        |
+
+-----
+
+** Progress Updates
+
+*** GET =/api/souls/progress_updates/=
+- *Description:* List progress updates (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_progress_updates=
+- *Access:* All roles
+
+**** Query Parameters
+| Field     | Type     | Required | Description               |
+|-----------+----------+----------+---------------------------|
+| page      | int (>0) | No       | Page number               |
+| page_size | int (>0) | No       | Items per page            |
+| soul_id   | int      | No       | Filter by soul            |
+| is_desc   | bool     | No       | Descending (default: true)|
+
+**** Response (200) - Paginated list of ProgressUpdateOut
+| Field          | Type   | Description          |
+|----------------+--------+----------------------|
+| id             | int    | Update ID            |
+| soul_id        | int    | Soul ID              |
+| content        | str    | Update content       |
+| update_date    | date   | Update date          |
+| soul_full_name | str    | Soul full name       |
+| created_at     | str    | ISO datetime         |
+| updated_at     | str    | ISO datetime         |
+
+-----
+
+*** POST =/api/souls/progress_updates/create/=
+- *Description:* Create a progress update
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_progress_update=
+- *Access:* All roles; Missioners restricted to own souls
+- *Restriction:* =missioner_template= restricted via handler
+
+**** Request Body (JSON)
+| Field       | Type | Required | Description        |
+|-------------+------+----------+--------------------|
+| soul_id     | int  | Yes      | Soul ID            |
+| content     | str  | Yes      | Update content     |
+| update_date | date | No       | Date of update     |
+
+**** Response (201) - ProgressUpdateOut
+
+-----
+
+*** GET =/api/souls/progress_updates/{progress_update_id}/=
+- *Description:* Get progress update details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_progress_update=
+- *Access:* All roles; Missioners restricted to own souls
+
+**** Response (200) - ProgressUpdateOut
+
+-----
+
+*** PATCH =/api/souls/progress_updates/{progress_update_id}/update/=
+- *Description:* Update a progress update
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_progress_update=
+- *Access:* All roles; Missioners restricted to own souls
+
+**** Request Body (JSON)
+| Field       | Type | Required | Description        |
+|-------------+------+----------+--------------------|
+| soul_id     | int  | Yes      | Soul ID            |
+| content     | str  | Yes      | Update content     |
+| update_date | date | No       | Date of update     |
+
+**** Response (200) - ProgressUpdateOut
+
+-----
+
+*** DELETE =/api/souls/progress_updates/{progress_update_id}/delete/=
+- *Description:* Delete a progress update
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_progress_update=
+- *Access:* Missioner (own), Staff, Admin, Superuser
+
+**** Response (200) - ProgressUpdateOut
+
+-----
+
+
+* Testimonies & Miracles (=/api/testimonies/=)
+
+** Testimonies
+
+*** GET =/api/testimonies/=
+- *Description:* List testimonies (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_testimonies=
+- *Access:* All roles
+
+**** Query Parameters
+| Field          | Type     | Required | Description               |
+|----------------+----------+----------+---------------------------|
+| page           | int (>0) | No       | Page number               |
+| page_size      | int (>0) | No       | Items per page            |
+| soul_id        | int      | No       | Filter by soul            |
+| user_id        | int      | No       | Filter by user            |
+| mission_id     | int      | No       | Filter by mission         |
+| created_before | date     | No       | YYYY-MM-DD                |
+| created_after  | date     | No       | YYYY-MM-DD                |
+| is_selected    | bool     | No       | Filter by selection status|
+| search         | str      | No       | Search title/content      |
+
+**** Response (200) - Paginated list of TestimonyOutSchema
+| Field          | Type     | Description           |
+|----------------+----------+-----------------------|
+| id             | int      | Testimony ID          |
+| title          | str      | Title                 |
+| content        | str      | Content               |
+| soul_id        | int/null | Soul ID               |
+| soul_full_name | str/null | Soul name             |
+| user_id        | int/null | User ID               |
+| user_full_name | str/null | User name             |
+| mission_id     | int/null | Mission ID            |
+| mission_title  | str/null | Mission title         |
+| photo_url      | str/null | Photo URL             |
+| is_selected    | bool     | Selected for publish  |
+| created_at     | str      | ISO datetime          |
+| updated_at     | str      | ISO datetime          |
+
+-----
+
+*** POST =/api/testimonies/create/=
+- *Description:* Create a testimony
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_testimony=
+- *Access:* Missioner, Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form)
+| Field      | Type | Required | Description    |
+|------------+------+----------+----------------|
+| title      | str  | Yes      | Title          |
+| content    | str  | Yes      | Content        |
+| soul_id    | int  | No       | Soul ID        |
+| user_id    | int  | No       | User ID        |
+| mission_id | int  | No       | Mission ID     |
+| photo      | File | No       | Photo upload   |
+
+**** Response (201) - TestimonyOutSchema
+
+-----
+
+*** GET =/api/testimonies/{testimony_id}/=
+- *Description:* Get testimony details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_testimony=
+- *Access:* All roles
+
+**** Response (200) - TestimonyOutSchema
+
+-----
+
+*** PATCH =/api/testimonies/{testimony_id}/update/=
+- *Description:* Update a testimony
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_testimony=
+- *Access:* Missioner (own, restricted), Staff, Admin, Superuser
+- *Restriction:* =missioner_template= restricted via handler
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form) - all fields optional
+Additional field: =is_selected= (bool) for staff+
+
+**** Response (200) - TestimonyOutSchema
+
+-----
+
+*** DELETE =/api/testimonies/{testimony_id}/delete/=
+- *Description:* Delete a testimony
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_testimony=
+- *Access:* Staff, Admin, Superuser
+
+**** Response (204) - "Testimony deleted successfully"
+
+-----
+
+** Miracles
+
+*** GET =/api/testimonies/miracles/=
+- *Description:* List miracles (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_miracles=
+- *Access:* All roles
+
+**** Query Parameters
+Same as testimonies filter (TestimonyAndMiracleFilterSchema).
+
+**** Response (200) - Paginated list of MiracleOutSchema
+| Field          | Type     | Description           |
+|----------------+----------+-----------------------|
+| id             | int      | Miracle ID            |
+| title          | str      | Title                 |
+| content        | str      | Content               |
+| soul_id        | int/null | Soul ID               |
+| soul_full_name | str/null | Soul name             |
+| user_id        | int/null | User ID               |
+| user_full_name | str/null | User name             |
+| mission_id     | int/null | Mission ID            |
+| mission_title  | str/null | Mission title         |
+| photo_url      | str/null | Photo URL             |
+| created_at     | str      | ISO datetime          |
+| updated_at     | str      | ISO datetime          |
+
+-----
+
+*** POST =/api/testimonies/miracles/create/=
+- *Description:* Create a miracle
+- *Auth Required:* Yes (JWT)
+- *Permission:* =create_miracle=
+- *Access:* Missioner, Staff, Admin, Superuser
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form)
+| Field      | Type | Required | Description    |
+|------------+------+----------+----------------|
+| title      | str  | Yes      | Title          |
+| content    | str  | Yes      | Content        |
+| soul_id    | int  | No       | Soul ID        |
+| user_id    | int  | No       | User ID        |
+| mission_id | int  | No       | Mission ID     |
+| photo      | File | No       | Photo upload   |
+
+**** Response (201) - MiracleOutSchema
+
+-----
+
+*** GET =/api/testimonies/miracles/{miracle_id}/=
+- *Description:* Get miracle details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_miracle=
+- *Access:* All roles
+
+**** Response (200) - MiracleOutSchema
+
+-----
+
+*** PATCH =/api/testimonies/miracles/{miracle_id}/update/=
+- *Description:* Update a miracle
+- *Auth Required:* Yes (JWT)
+- *Permission:* =update_miracle=
+- *Access:* Missioner (own, restricted), Staff, Admin, Superuser
+- *Restriction:* =missioner_template= restricted via handler
+- *Content-Type:* =multipart/form-data=
+
+**** Request Body (Form) - all fields optional
+**** Response (200) - MiracleOutSchema
+
+-----
+
+*** DELETE =/api/testimonies/miracles/{miracle_id}/delete/=
+- *Description:* Delete a miracle
+- *Auth Required:* Yes (JWT)
+- *Permission:* =delete_miracle=
+- *Access:* Staff, Admin, Superuser
+
+**** Response (204) - "Miracle deleted successfully"
+
+-----
+
+
+* Audit Logs (=/api/audit_logs/=)
+
+** GET =/api/audit_logs/=
+- *Description:* List audit log entries (paginated)
+- *Auth Required:* Yes (JWT)
+- *Permission:* =list_auditlogs=
+- *Access:* Admin, Exec, Superuser
+
+*** Query Parameters
+| Field           | Type     | Required | Description                                            |
+|-----------------+----------+----------+--------------------------------------------------------|
+| page            | int (>0) | No       | Page number                                            |
+| page_size       | int (>0) | No       | Items per page                                         |
+| user_id         | int      | No       | Filter by user                                         |
+| action_type     | enum     | No       | login/logout/creation/modification/deletion/reports    |
+| action_category | enum     | No       | authentication/souls/locations/mission_categories/     |
+|                 |          |          | missions/users/reports                                 |
+| is_successful   | bool     | No       | Filter by success                                      |
+| flag_suspicious | bool     | No       | Filter flagged entries                                 |
+| ip_address      | str      | No       | Filter by IP                                           |
+
+*** Response (200) - Paginated list of AuditLogSchema
+| Field              | Type   | Description              |
+|--------------------+--------+--------------------------|
+| id                 | int    | Log entry ID             |
+| user_id            | int    | User who performed action|
+| action_type        | str    | Type of action           |
+| action_category    | str    | Category of action       |
+| action_description | str    | Human-readable description|
+| is_successful      | bool   | Whether action succeeded |
+| ip_address         | str    | User IP address          |
+| flag_suspicious    | bool   | Flagged as suspicious    |
+| created_at         | str    | ISO datetime             |
+| updated_at         | str    | ISO datetime             |
+
+-----
+
+** GET =/api/audit_logs/{id}/=
+- *Description:* Get audit log details
+- *Auth Required:* Yes (JWT)
+- *Permission:* =view_auditlog=
+- *Access:* Admin, Exec, Superuser
+
+*** Response (200) - AuditLogSchema
+
+-----
+
+** POST =/api/audit_logs/{id}/flag_suspicious/=
+- *Description:* Flag an audit log entry as suspicious
+- *Auth Required:* Yes (JWT)
+- *Permission:* =flag_suspicious_auditlog=
+- *Access:* Admin, Superuser
+
+*** Response (200) - AuditLogSchema
+
+-----
+
+** POST =/api/audit_logs/{id}/unflag_suspicious/=
+- *Description:* Remove suspicious flag from an audit log entry
+- *Auth Required:* Yes (JWT)
+- *Permission:* =unflag_suspicious_auditlog=
+- *Access:* Admin, Superuser
+
+*** Response (200) - AuditLogSchema
+
+-----
+
+* Health Check
+
+** GET =/health/=
+- *Description:* Application health check (used by Docker healthcheck)
+- *Auth Required:* No
+- *Access:* Public
+
+*** Response (200)
+#+begin_src json
+{"status": "ok"}
+#+end_src
+
+-----
+
+** GET =/api/health/=
+- *Description:* API health check
+- *Auth Required:* No
+- *Access:* Public
+
+*** Response (200)
+#+begin_src json
+{"status": "ok"}
+#+end_src
+
+-----
+
+* Appendix: Complete Permissions Reference
+
+** All Available Permissions
+
+#+begin_example
+view_user, list_users, add_user, update_user, delete_user,
+view_role, list_roles, add_role, update_role, delete_role,
+create_location, view_location, list_locations, update_location, delete_location,
+create_mission, view_mission, list_missions, update_mission, delete_mission,
+create_mission_category, list_mission_categories, view_mission_category,
+update_mission_category, delete_mission_category,
+create_mission_report, view_mission_report, list_mission_reports,
+update_mission_report, delete_mission_report,
+create_soul, list_souls, view_soul, update_soul, delete_soul, upload_souls,
+create_miracle, list_miracles, view_miracle, update_miracle, delete_miracle,
+create_testimony, list_testimonies, view_testimony, update_testimony, delete_testimony,
+create_photo_gallery, list_photo_galleries, view_photo_gallery,
+update_photo_gallery, delete_photo_gallery,
+create_progress_update, view_progress_update, list_progress_updates,
+update_progress_update, delete_progress_update,
+view_auditlog, list_auditlogs,
+view_missioner_stats, view_admin_stats, soul_stats,
+list_permissions,
+create_jia_participant, view_jia_participant, list_jia_participants,
+update_jia_participant, delete_jia_participant,
+view_exec_dashboard
+#+end_example
+
+** Permissions by Role
+
+*** Missioner
+#+begin_example
+view_location, list_locations, list_missions, view_mission,
+view_mission_category, list_mission_categories, view_mission_report,
+view_user, update_user (own only), view_role,
+create_soul, update_soul, view_soul, list_souls (own only),
+list_miracles, create_miracle, view_miracle,
+create_testimony, list_testimonies, view_testimony, update_testimony,
+view_photo_gallery, list_photo_galleries,
+create_progress_update, list_progress_updates, update_progress_update,
+view_progress_update, delete_progress_update,
+view_missioner_stats, view_jia_participant, soul_stats
+#+end_example
+
+*** Staff (includes all Missioner permissions +)
+#+begin_example
+create_location, update_location,
+create_mission, update_mission,
+create_mission_category, update_mission_category,
+create_mission_report, update_mission_report, delete_mission_report,
+update_soul, update_miracle, delete_miracle,
+update_testimony, delete_testimony,
+create_photo_gallery, update_photo_gallery, delete_photo_gallery,
+update_progress_update,
+create_jia_participant, update_jia_participant, view_jia_participant,
+list_jia_participants, delete_jia_participant,
+upload_souls
+#+end_example
+
+*** Admin (includes all Staff permissions +)
+#+begin_example
+view_user, list_users, add_user, update_user, delete_user,
+view_role, add_role, update_role, delete_role,
+view_auditlog, list_auditlogs,
+delete_soul, delete_mission, delete_mission_category, delete_location,
+view_admin_stats, view_missioner_stats,
+list_permissions, delete_jia_participant,
+flag_log_suspicious, unflag_log_suspicious
+#+end_example
+
+*** Exec (read-only across all resources)
+#+begin_example
+view_user, list_users, view_role, list_roles,
+view_location, list_locations,
+view_mission, list_missions,
+view_mission_category, list_mission_categories,
+view_mission_report, list_mission_reports,
+view_soul, list_souls,
+view_miracle, list_miracles,
+view_testimony, list_testimonies,
+view_photo_gallery, list_photo_galleries,
+view_progress_update, list_progress_updates,
+view_auditlog, list_auditlogs,
+view_missioner_stats, view_exec_dashboard,
+view_jia_participant, list_jia_participants
+#+end_example
+
+*** Superuser
+All permissions (full access).
+
+-----
+
+* Appendix: Common Response Patterns
+
+** Paginated Response Structure
+#+begin_src json
+{
+  "count": 100,
+  "page": 1,
+  "page_size": 20,
+  "last_page": 5,
+  "data": [...]
+}
+#+end_src
+
+** Error Response
+#+begin_src json
+{"detail": "Error message here"}
+#+end_src
+
+** Common HTTP Status Codes
+| Code | Meaning                                    |
+|------+--------------------------------------------|
+|  200 | Success                                    |
+|  201 | Created                                    |
+|  204 | Deleted / No content                       |
+|  400 | Validation error / Bad request             |
+|  401 | Unauthenticated / Invalid credentials      |
+|  403 | Permission denied / Account disabled       |
+|  404 | Resource not found                         |
+|  500 | Internal server error                      |
+
+** Authentication Header Format
+#+begin_example
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+#+end_example
+

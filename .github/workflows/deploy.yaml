@@ -1,20 +1,26 @@
 name: Deploy to Server
 
+# Runs AFTER the image is built & pushed to GHCR, so the VM only needs to sync
+# config (compose/nginx changes) and pull the prebuilt image — no building on
+# the 1GB VM. Watchtower handles image-only changes continuously between merges.
 on:
-  push:
+  workflow_run:
+    workflows: ["Build & Push Image"]
+    types:
+      - completed
     branches:
       - main
+  workflow_dispatch: {}
 
 jobs:
   #  TODO: Add ci segment for tests before deployment
   deploy:
     name: Deploy GIK Missions Backend
     runs-on: ubuntu-latest
+    # Only deploy if the image build succeeded (skip on manual dispatch too).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Set up SSH
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -24,12 +30,12 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
           cd ${{ secrets.PROJECT_PATH }}
-          echo "Pulling latest code..."
+          echo "Syncing config from git..."
           git fetch --all
           git reset --hard origin/main
-          echo "Building and restarting containers..."
-          docker compose down
-          docker compose up -d --build
-          docker system prune -f
+          echo "Pulling prebuilt image and restarting..."
+          docker compose pull
+          docker compose up -d
+          docker image prune -f
           echo "Deployment complete!"
           EOF

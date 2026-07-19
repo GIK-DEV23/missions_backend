@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+
+# Required: your GCP project ID.
+project_id = "your-gcp-project-id"
+
+# Free-tier region/zone (must be us-west1, us-central1, or us-east1).
+region = "us-central1"
+zone   = "us-central1-a"
+
+# Your SSH public key (defaults to ~/.ssh/id_rsa.pub if omitted).
+# ssh_public_key_path = "~/.ssh/id_rsa.pub"
+# ssh_user            = "deployer"
+
+# Restrict SSH to your own IP for safety, e.g. ["203.0.113.5/32"].
+# allowed_ssh_source_ranges = ["0.0.0.0/0"]
+
+# Optional: auto-clone the repo on first boot (use an https or deploy-key URL).
+# git_repo_url = "https://github.com/your-org/missions_backend.git"

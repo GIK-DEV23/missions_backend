@@ -24,7 +24,7 @@ def get_reports_dir(instance, filename):
     # Format timestamp to 'YYYY-MM-DD_HH-MM-SS'
     timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
     # Create the path
-    title = instance.title.strip().replace(" ", "_").to_lower()
+    title = instance.title.strip().replace(" ", "_").lower()
     return os.path.join("missions", "reports", title, "{}{}".format(timestamp, ext))
 
 

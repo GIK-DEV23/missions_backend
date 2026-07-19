@@ -1,11 +1,18 @@
 services:
   backend:
+    # On the VM we pull this prebuilt image from GHCR (built by CI, not on the
+    # 1GB VM). `build: .` is kept so local dev can still `docker compose build`.
+    image: ${BACKEND_IMAGE:-ghcr.io/paulwritescode/missions_backend:latest}
     build: .
     container_name: missions_backend
     env_file:
       - .env
     ports:
       - "9050:8000"
+    # Watchtower only auto-updates containers carrying this label, so it never
+    # touches postgres/redis/nginx — only the app image.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1" ]
       interval: 10s
@@ -68,11 +75,30 @@ services:
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # React (Vite) build. Populate via deploy/FRONTEND_DEPLOY_VITE.md — this
+      # dir is untracked by git so `git reset --hard` in the deploy workflow
+      # never touches it.
+      - ./frontend/dist:/app/frontend/dist:ro
       - media_volume:/app/media
       - static_volume:/app/static
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
+
+  # Pull-based GitOps: polls GHCR and, when CI pushes a new backend image,
+  # pulls it and recreates the backend container automatically (no SSH deploy
+  # needed for code changes). --label-enable limits it to the backend only.
+  watchtower:
+    # containrrr/watchtower is unmaintained; its bundled Docker client is too
+    # old for modern Docker Engine API versions. Use the maintained fork.
+    image: nickfedor/watchtower:latest
+    container_name: missions_watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount registry creds only if the GHCR package is PRIVATE (see README).
+      # - /home/deployer/.docker/config.json:/config.json:ro
+    command: --label-enable --cleanup --interval ${WATCHTOWER_INTERVAL:-60}
     restart: unless-stopped
 
 volumes:
