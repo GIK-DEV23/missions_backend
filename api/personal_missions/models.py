@@ -1,5 +1,6 @@
 from typing import Any, Dict, Optional
 
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.http import HttpRequest
 
@@ -15,7 +16,11 @@ class PersonalMission(BaseModel):
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)
     rhythm = models.CharField(max_length=20, choices=PersonalMissionRhythm.choices, default=PersonalMissionRhythm.NONE)
-    rhythm_day = models.PositiveSmallIntegerField(null=True, blank=True, help_text="0-6, Monday-Sunday")
+    rhythm_day = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(6)],
+        help_text="0-6, Monday-Sunday",
+    )
     location = models.CharField(max_length=200, null=True, blank=True)
     reminder_enabled = models.BooleanField(default=False)
     reminder_time = models.TimeField(null=True, blank=True)
