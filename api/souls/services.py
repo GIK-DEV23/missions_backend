@@ -14,10 +14,10 @@ from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.file_parser import FileParser
-from base.utils.helpers import validate_date
+from base.utils.helpers import validate_date, resolve_fk_by_client_id
 from missions.selectors import location_details, mission_details
 from souls.models import Soul, ProgressUpdate
-from souls.selectors import get_soul
+from souls.selectors import get_soul, get_soul_by_client_id
 from users.constants import GenderType, AgeGroupCategory
 from users.models import User
 from users.selectors import user_details
@@ -51,6 +51,9 @@ def create_soul(data) -> Soul:
 def update_soul(user, soul_id, data) -> Soul:
     try:
         soul = get_soul(soul_id)
+        new_contact_outcome = data.get("contact_outcome")
+        if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
+            raise CustomValidationError("contact_outcome is immutable once set")
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:
@@ -99,12 +102,25 @@ def delete_soul(user, soul_id) -> Soul:
 
 
 def create_progress_update(data: dict) -> ProgressUpdate:
-    soul_id = data.pop("soul_id")
+    data = resolve_fk_by_client_id(data, "soul", Soul)
+    soul_id = data.pop("soul_id", None)
+    if not soul_id:
+        raise CustomValidationError("Either soul_id or soul_client_id is required")
     soul = get_soul(soul_id)
+    author_id = data.pop("author_id", None)
+    if author_id is not None:
+        data["author"] = user_details(author_id)
+    next_check_in_at = data.get("next_check_in_at")
     try:
         progress_update = ProgressUpdate(soul=soul, **data)
         progress_update.full_clean()
         progress_update.save()
+        soul_update_fields = ["last_contacted_at"]
+        soul.last_contacted_at = progress_update.created_at
+        if next_check_in_at:
+            soul.next_check_in_at = next_check_in_at
+            soul_update_fields.append("next_check_in_at")
+        soul.save(update_fields=soul_update_fields)
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -115,12 +131,20 @@ def create_progress_update(data: dict) -> ProgressUpdate:
 
 def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdate:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        author_id = data.pop("author_id", None)
+        if author_id is not None:
+            data["author"] = user_details(author_id)
+        next_check_in_at = data.get("next_check_in_at")
         for key, value in data.items():
             if value is not None:
                 setattr(progress_update, key, value)
         progress_update.full_clean()
         progress_update.save()
+        if next_check_in_at:
+            progress_update.soul.next_check_in_at = next_check_in_at
+            progress_update.soul.save(update_fields=["next_check_in_at"])
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")
     except ValidationError as e:
@@ -134,7 +158,11 @@ def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdat
 def delete_progress_update(progress_update_id: int) -> ProgressUpdate:
     try:
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        soul = progress_update.soul
         progress_update.delete()
+        latest = soul.progress_updates.order_by("-created_at").first()
+        soul.last_contacted_at = latest.created_at if latest else None
+        soul.save(update_fields=["last_contacted_at"])
         return progress_update
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")
@@ -241,12 +269,15 @@ def upload_souls(user, file, mission_id: int, location_id: int):
 
 
 def progress_update_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
-    soul_id = kwargs.get("progress_update_in").soul_id if "progress_update_in" in kwargs else kwargs.get("soul_id")
-    if not soul_id:
+    progress_update_in = kwargs.get("progress_update_in")
+    soul_id = progress_update_in.soul_id if progress_update_in else kwargs.get("soul_id")
+    soul_client_id = progress_update_in.soul_client_id if progress_update_in else None
+    if soul_id:
+        soul = get_soul(soul_id)
+    elif soul_client_id:
+        soul = get_soul_by_client_id(soul_client_id)
+    else:
         return None
-    soul = get_soul(soul_id)
     if not soul.user or soul.user.pk != user.pk:
         raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None

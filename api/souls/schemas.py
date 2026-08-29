@@ -1,11 +1,12 @@
 import datetime
+import uuid
 from enum import Enum
 from typing import Optional
 
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import JourneyStage
+from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -43,6 +44,7 @@ class SoulsQuery(BaseQuery):
 
 class SoulCreate(Schema):
     """Schema for creating a soul."""
+    client_id: Optional[uuid.UUID] = None
     first_name: str
     last_name: str
     phone_number: str
@@ -50,6 +52,7 @@ class SoulCreate(Schema):
     age_group: AgeGroupCategory
     location: Optional[int] = None
     status: JourneyStage
+    contact_outcome: Optional[ContactOutcome] = None
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     is_personal: bool = False
@@ -66,6 +69,7 @@ class SoulUpdate(Schema):
     age_group: Optional[AgeGroupCategory] = None
     location: Optional[int] = None
     status: Optional[JourneyStage] = None
+    contact_outcome: Optional[ContactOutcome] = None
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     is_personal: bool = False
@@ -85,6 +89,7 @@ class SoulUploadIn(Schema):
 
 class SoulOut(BaseOut):
     """Schema for soul output."""
+    client_id: Optional[str] = None
     first_name: str
     last_name: str
     phone_number: str
@@ -93,6 +98,7 @@ class SoulOut(BaseOut):
     location_id: Optional[int] = None
     location_name: Optional[str] = None
     status: str
+    contact_outcome: Optional[str] = None
     date_added: datetime.date
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
@@ -101,6 +107,8 @@ class SoulOut(BaseOut):
     user_full_name: Optional[str] = None
     soul_full_name: str
     description: Optional[str] = None
+    next_check_in_at: Optional[str] = None
+    last_contacted_at: Optional[str] = None
 
 
 class SoulDetailsOut(SoulOut):
@@ -111,16 +119,28 @@ class SoulDetailsOut(SoulOut):
 
 class ProgressUpdateCreate(Schema):
     """Schema for creating a progress update."""
-    soul_id: int
+    client_id: Optional[uuid.UUID] = None
+    soul_id: Optional[int] = None
+    soul_client_id: Optional[uuid.UUID] = None
+    author_id: Optional[int] = None
     content: str
     update_date: Optional[datetime.date] = None
+    type: Optional[ProgressUpdateType] = None
+    outcome: Optional[ProgressUpdateOutcome] = None
+    next_check_in_at: Optional[datetime.datetime] = None
 
 
 class ProgressUpdateOut(BaseOut):
     """Schema for progress update output."""
+    client_id: Optional[str] = None
     soul_id: int
+    author_id: Optional[int] = None
+    author_full_name: Optional[str] = None
     content: str
     update_date: datetime.date
+    type: Optional[str] = None
+    outcome: Optional[str] = None
+    next_check_in_at: Optional[str] = None
     soul_full_name: Optional[str] = None
 
 

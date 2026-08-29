@@ -10,6 +10,7 @@ from users.api import router as users_router
 from missions.api import router as missions_router
 from souls.api import router as souls_router
 from testimonies.api import router as testimonies_router
+from sync.api import router as sync_router
 
 
 api = NinjaAPI()
@@ -25,6 +26,7 @@ api.add_router("/users/", users_router)
 api.add_router("/missions/", missions_router)
 api.add_router("/souls/", souls_router)
 api.add_router("/testimonies/", testimonies_router)
+api.add_router("/sync/", sync_router)
 
 
 @api.exception_handler(ValidationError)
