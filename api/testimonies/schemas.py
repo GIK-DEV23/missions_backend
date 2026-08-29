@@ -2,6 +2,7 @@
 Schemas for testimonies and miracles using Django Ninja (pydantic)
 """
 import datetime
+import uuid
 from typing import Optional, List
 
 from ninja import Schema
@@ -11,9 +12,11 @@ from base.schemas import BaseQuery, BaseOut
 
 
 class TestimonyCreateSchema(Schema):
+    client_id: Optional[uuid.UUID] = None
     title: str
     content: str
     soul_id: Optional[int] = None
+    soul_client_id: Optional[uuid.UUID] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
 
@@ -28,6 +31,7 @@ class TestimonyUpdateSchema(Schema):
 
 
 class TestimonyOutSchema(BaseOut):
+    client_id: Optional[str] = None
     title: str
     content: str
     soul_id: Optional[int] = None
@@ -51,9 +55,11 @@ class TestimonyAndMiracleFilterSchema(BaseQuery):
 
 
 class MiracleCreateSchema(Schema):
+    client_id: Optional[uuid.UUID] = None
     title: str
     content: str
     soul_id: Optional[int] = None
+    soul_client_id: Optional[uuid.UUID] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
 
@@ -67,6 +73,7 @@ class MiracleUpdateSchema(Schema):
 
 
 class MiracleOutSchema(BaseOut):
+    client_id: Optional[str] = None
     title: str
     content: str
     soul_id: Optional[int] = None
