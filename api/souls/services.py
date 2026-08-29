@@ -118,6 +118,7 @@ def create_progress_update(data: dict) -> ProgressUpdate:
 
 def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdate:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
         for key, value in data.items():
             if value is not None:

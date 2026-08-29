@@ -3,6 +3,7 @@ import uuid
 
 from django.test import TestCase
 
+from base.utils.exceptions import CustomValidationError
 from missions import services
 from missions.constants import LocationCategoryType
 from missions.models import Location, MissionCategory, Mission
@@ -53,3 +54,18 @@ class ClientIdTests(TestCase):
             client_id=client_id,
         )
         self.assertEqual(participant.client_id, client_id)
+
+    def test_duplicate_participant_gives_friendly_message(self):
+        kwargs = dict(
+            mission_id=self.mission.id,
+            travelling_from="Mombasa",
+            days_of_attendance=[{"day": 1, "day_date": datetime.date(2026, 3, 1)}],
+            gender=GenderType.MALE,
+            full_name="John Doe",
+            phone_number="+254700000010",
+            diet_advisory="",
+        )
+        services.create_mission_participant(**kwargs)
+        with self.assertRaises(CustomValidationError) as ctx:
+            services.create_mission_participant(**kwargs)
+        self.assertIn("already exists", str(ctx.exception.errors))

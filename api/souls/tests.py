@@ -69,3 +69,19 @@ class ClientIdTests(TestCase):
                 "content": "Checked in",
                 "update_date": "2026-01-05",
             })
+
+    def test_update_progress_update_resolves_soul_by_client_id(self):
+        soul_a = services.create_soul(self._soul_data(client_id=uuid.uuid4()))
+        soul_b_client_id = uuid.uuid4()
+        soul_b = services.create_soul(self._soul_data(phone_number="+254700000003", client_id=soul_b_client_id))
+        progress_update = services.create_progress_update({
+            "soul_id": soul_a.id,
+            "content": "Checked in",
+            "update_date": "2026-01-05",
+        })
+        updated = services.update_progress_update(progress_update.id, {
+            "soul_client_id": soul_b_client_id,
+            "content": None,
+            "update_date": None,
+        })
+        self.assertEqual(updated.soul_id, soul_b.id)
