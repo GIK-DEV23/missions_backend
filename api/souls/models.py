@@ -19,6 +19,7 @@ class Soul(BaseModel):
     contact_outcome = models.CharField(max_length=30, choices=ContactOutcome.choices, null=True, blank=True)
     date_added = models.DateField()
     mission = models.ForeignKey("missions.Mission", on_delete=models.PROTECT, null=True, blank=True, related_name='souls')
+    personal_mission = models.ForeignKey("personal_missions.PersonalMission", on_delete=models.SET_NULL, null=True, blank=True, related_name='souls')
     is_personal = models.BooleanField(default=False)
     user = models.ForeignKey("users.User", on_delete=models.PROTECT, null=True, blank=True, related_name='souls')
     description = models.CharField(max_length=250, null=True, blank=True)
@@ -48,6 +49,7 @@ class Soul(BaseModel):
             "location_name": self.location.name if self.location else None,
             "mission_id": self.mission.id if self.mission else None,
             "mission_title": self.mission.title if self.mission else None,
+            "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
             "user_id": self.user.id if self.user else None,
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
             "soul_full_name": self.get_full_name()

@@ -65,6 +65,15 @@ class Testimony(BaseModel):
         null = True,
         blank = True,
     )
+    personal_mission = models.ForeignKey(
+        "personal_missions.PersonalMission",
+        on_delete=models.SET_NULL,
+        related_name="testimonies",
+        help_text="The personal mission associated with this testimony",
+        null=True,
+        blank=True,
+    )
+    is_personal = models.BooleanField(default=False)
     photo = models.ImageField(
         upload_to=get_testimonies_dir,
         null=True,
@@ -93,6 +102,7 @@ class Testimony(BaseModel):
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
             "mission_id": self.mission.id if self.mission else None,
             "mission_title": self.mission.title if self.mission else None,
+            "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
         })
         return data
@@ -137,6 +147,15 @@ class Miracle(BaseModel):
         null = True,
         blank = True,
     )
+    personal_mission = models.ForeignKey(
+        "personal_missions.PersonalMission",
+        on_delete=models.SET_NULL,
+        related_name="miracles",
+        help_text="The personal mission associated with this miracle",
+        null=True,
+        blank=True,
+    )
+    is_personal = models.BooleanField(default=False)
     is_selected = models.BooleanField(
         default=False,
         help_text="Indicates whether the miracle has been selected",
@@ -159,6 +178,7 @@ class Miracle(BaseModel):
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
             "mission_id": self.mission.id if self.mission else None,
             "mission_title": self.mission.title if self.mission else None,
+            "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
         })
         return data

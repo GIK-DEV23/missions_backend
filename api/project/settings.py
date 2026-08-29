@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "base",
     "users",
     "missions",
+    "personal_missions",
     "souls",
     "testimonies",
     "audit_logs",
