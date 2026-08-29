@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from decimal import Decimal
 from enum import Enum
 
@@ -125,6 +126,7 @@ class MissionCategoryOutSchema(BaseOut):
 
 
 class MissionCreateSchema(Schema):
+    client_id: uuid.UUID | None = None
     title: str
     description: str
     category_id: int
@@ -171,6 +173,7 @@ class MissionFilterSchema(BaseQuery):
 
 
 class MinimalMissionOutSchema(BaseOut):
+    client_id: str | None = None
     title: str
     description: str
     category_name: str | None = None
@@ -206,6 +209,7 @@ class AttendanceDayOut(Schema):
 
 
 class MissionParticipantCreateSchema(Schema):
+    client_id: uuid.UUID | None = None
     mission_id: int
     user_id: int | None = ""
     full_name: str | None = ""
@@ -238,6 +242,7 @@ class BulkUpdateMissionJIASchema(Schema):
 
 
 class MissionParticipantOutSchema(BaseOut):
+    client_id: str | None = None
     mission_id: int | None = None
     mission_title: str | None = None
     user_id: int | None = None
