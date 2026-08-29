@@ -5,7 +5,7 @@ from typing import Optional
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import SoulStatus
+from souls.constants import JourneyStage
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -32,7 +32,7 @@ class SoulsQuery(BaseQuery):
     gender: Optional[GenderType] = None
     age_group: Optional[AgeGroupCategory] = None
     location: Optional[int] = None
-    status: Optional[SoulStatus] = None
+    status: Optional[JourneyStage] = None
     search: Optional[str] = None
     created_before: Optional[datetime.date] = None
     created_after: Optional[datetime.date] = None
@@ -49,7 +49,7 @@ class SoulCreate(Schema):
     gender: GenderType
     age_group: AgeGroupCategory
     location: Optional[int] = None
-    status: SoulStatus
+    status: JourneyStage
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     is_personal: bool = False
@@ -65,7 +65,7 @@ class SoulUpdate(Schema):
     gender: Optional[GenderType] = None
     age_group: Optional[AgeGroupCategory] = None
     location: Optional[int] = None
-    status: Optional[SoulStatus] = None
+    status: Optional[JourneyStage] = None
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     is_personal: bool = False
