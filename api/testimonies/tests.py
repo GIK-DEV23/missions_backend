@@ -4,7 +4,7 @@ from django.test import TestCase
 
 from base.utils.exceptions import CustomValidationError
 from souls import services as soul_services
-from souls.constants import SoulStatus
+from souls.constants import JourneyStage
 from testimonies import services
 from users.constants import GenderType, AgeGroupCategory
 
@@ -17,7 +17,7 @@ class ClientIdTests(TestCase):
             "phone_number": "+254700000001",
             "gender": GenderType.FEMALE,
             "age_group": AgeGroupCategory.ADULT,
-            "status": SoulStatus.NEW_CONVERT,
+            "status": JourneyStage.NEW_BELIEVER,
             "date_added": "2026-01-01",
             "client_id": client_id or uuid.uuid4(),
         })

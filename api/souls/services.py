@@ -51,6 +51,9 @@ def create_soul(data) -> Soul:
 def update_soul(user, soul_id, data) -> Soul:
     try:
         soul = get_soul(soul_id)
+        new_contact_outcome = data.get("contact_outcome")
+        if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
+            raise CustomValidationError("contact_outcome is immutable once set")
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:

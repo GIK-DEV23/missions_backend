@@ -5,7 +5,7 @@ from django.test import TestCase
 from sync import services, selectors
 from sync.constants import SyncEntity, SyncOp, SyncMutationStatus
 from sync.models import SyncMutation
-from souls.constants import SoulStatus
+from souls.constants import JourneyStage
 from souls.models import Soul
 from users.constants import GenderType, AgeGroupCategory
 from users.models import Role, User
@@ -30,7 +30,7 @@ def _soul_payload(**overrides):
         "phone_number": "+254700000021",
         "gender": GenderType.FEMALE,
         "age_group": AgeGroupCategory.ADULT,
-        "status": SoulStatus.NEW_CONVERT,
+        "status": JourneyStage.NEW_BELIEVER,
         "date_added": "2026-01-01",
     }
     data.update(overrides)
