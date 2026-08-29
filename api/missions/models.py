@@ -7,7 +7,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
-from base.models import BaseModel
+from base.models import BaseModel, client_id_field
 from base.utils.exceptions import CustomValidationError
 from missions.constants import LocationCategoryType, MissionStatusType, EventType
 from missions.schemas import AttendanceDayOut
@@ -90,6 +90,7 @@ class MissionCategory(BaseModel):
 
 
 class Mission(BaseModel):
+    client_id = client_id_field()
     title = models.CharField(max_length=200)
     description = models.TextField()
     category = models.ForeignKey(MissionCategory, on_delete=models.PROTECT, related_name='missions')
@@ -147,6 +148,7 @@ class Mission(BaseModel):
 
 
 class MissionJIAParticipant(BaseModel):
+    client_id = client_id_field()
     mission = models.ForeignKey(Mission, on_delete=models.PROTECT, related_name='participants')
     user = models.ForeignKey('users.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='jia_participations')
     full_name = models.CharField(max_length=100)

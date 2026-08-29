@@ -5,7 +5,7 @@ from django.db import models
 from django.http import HttpRequest
 from django.utils import timezone
 
-from base.models import BaseModel
+from base.models import BaseModel, client_id_field
 
 
 def get_testimonies_dir(instance, filename):
@@ -33,6 +33,7 @@ def get_miracles_dir(instance, filename):
 
 class Testimony(BaseModel):
     """Model to store testimonies"""
+    client_id = client_id_field()
     title = models.CharField(
         max_length=255,
         help_text="Title of the testimony",
@@ -98,6 +99,7 @@ class Testimony(BaseModel):
 
 
 class Miracle(BaseModel):
+    client_id = client_id_field()
     title = models.CharField(
         max_length=255,
         help_text="Title of the miracle",

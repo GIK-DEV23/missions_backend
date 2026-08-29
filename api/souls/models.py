@@ -4,12 +4,13 @@ from django.db import models
 from django.http import HttpRequest
 from phonenumber_field.modelfields import PhoneNumberField
 
-from base.models import BaseModel
+from base.models import BaseModel, client_id_field
 from souls.constants import SoulStatus
 from users.constants import GenderType, AgeGroupCategory
 
 
 class Soul(BaseModel):
+    client_id = client_id_field()
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     phone_number = PhoneNumberField()
@@ -70,6 +71,7 @@ class Soul(BaseModel):
 
 
 class ProgressUpdate(BaseModel):
+    client_id = client_id_field()
     soul = models.ForeignKey(Soul, on_delete=models.CASCADE, related_name='progress_updates')
     content = models.TextField()
     update_date = models.DateField()
