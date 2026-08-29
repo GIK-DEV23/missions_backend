@@ -28,6 +28,12 @@ class Soul(BaseModel):
     uploaded_at = models.DateTimeField(null=True, blank=True)
     next_check_in_at = models.DateTimeField(null=True, blank=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True, help_text="Derived from progress updates, never written directly")
+    consent_given = models.BooleanField(default=False)
+    consent_recorded_at = models.DateTimeField(null=True, blank=True)
+    do_not_contact = models.BooleanField(default=False)
+    do_not_contact_at = models.DateTimeField(null=True, blank=True)
+    possible_duplicate_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='possible_duplicates')
+    deleted_at = models.DateTimeField(null=True, blank=True, help_text="Tombstone, set when merged into another soul")
 
     class Meta:
         db_table = "souls"
@@ -50,6 +56,7 @@ class Soul(BaseModel):
             "mission_id": self.mission.id if self.mission else None,
             "mission_title": self.mission.title if self.mission else None,
             "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
+            "possible_duplicate_of": self.possible_duplicate_of_id,
             "user_id": self.user.id if self.user else None,
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
             "soul_full_name": self.get_full_name()
