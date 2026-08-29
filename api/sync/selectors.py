@@ -27,16 +27,18 @@ def visible_souls(user):
 
 
 def visible_testimonies(user):
+    """Testimony has no is_personal field yet (unlike Soul) — special users see
+    everything, everyone else sees only what they submitted."""
     qs = Testimony.objects.select_related("soul", "user", "mission")
     if _is_special_user(user):
-        return qs.filter(Q(is_personal=False) | Q(user=user))
+        return qs
     return qs.filter(user=user)
 
 
 def visible_miracles(user):
     qs = Miracle.objects.select_related("soul", "user", "mission")
     if _is_special_user(user):
-        return qs.filter(Q(is_personal=False) | Q(user=user))
+        return qs
     return qs.filter(user=user)
 
 

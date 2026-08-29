@@ -154,12 +154,13 @@ def delete_miracle(miracle_id: int) -> Miracle:
 
 
 def miracle_and_testimony_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
-
-    soul_id = kwargs.get('testimony_in', {}).soul_id or \
-              kwargs.get('miracle_in', {}).soul_id or \
-              kwargs.get('soul_id')
+    testimony_in = kwargs.get('testimony_in')
+    miracle_in = kwargs.get('miracle_in')
+    soul_id = (
+        (testimony_in.soul_id if testimony_in else None)
+        or (miracle_in.soul_id if miracle_in else None)
+        or kwargs.get('soul_id')
+    )
 
     if not soul_id:
         return None
