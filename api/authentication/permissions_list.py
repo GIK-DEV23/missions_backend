@@ -67,6 +67,8 @@ ALL_PERMISSIONS = {
     "update_jia_participant",
     "delete_jia_participant",
     "view_exec_dashboard",
+    "sync_mutations",
+    "sync_changes",
 }
 
 # Permission templates for different roles
@@ -105,6 +107,8 @@ MISSIONER_PERMISSIONS = {
     "delete_progress_update",
     "update_testimony",
     "update_testimony",
+    "sync_mutations",
+    "sync_changes",
 }
 
 STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
@@ -189,6 +193,7 @@ EXEC_PERMISSIONS = {
     "view_exec_dashboard",
     "view_jia_participant",
     "list_jia_participants",
+    "sync_changes",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS
