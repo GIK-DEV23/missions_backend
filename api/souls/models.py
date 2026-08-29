@@ -5,7 +5,7 @@ from django.http import HttpRequest
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel, client_id_field
-from souls.constants import JourneyStage, ContactOutcome
+from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -25,6 +25,8 @@ class Soul(BaseModel):
     gender = models.CharField(max_length=50, choices=GenderType.choices)
     age_group = models.CharField(max_length=30, choices=AgeGroupCategory.choices)
     uploaded_at = models.DateTimeField(null=True, blank=True)
+    next_check_in_at = models.DateTimeField(null=True, blank=True)
+    last_contacted_at = models.DateTimeField(null=True, blank=True, help_text="Derived from progress updates, never written directly")
 
     class Meta:
         db_table = "souls"
@@ -74,8 +76,12 @@ class Soul(BaseModel):
 class ProgressUpdate(BaseModel):
     client_id = client_id_field()
     soul = models.ForeignKey(Soul, on_delete=models.CASCADE, related_name='progress_updates')
+    author = models.ForeignKey("users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='authored_progress_updates')
     content = models.TextField()
     update_date = models.DateField()
+    type = models.CharField(max_length=20, choices=ProgressUpdateType.choices, null=True, blank=True)
+    outcome = models.CharField(max_length=20, choices=ProgressUpdateOutcome.choices, null=True, blank=True)
+    next_check_in_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "soul_progress_updates"
@@ -89,5 +95,7 @@ class ProgressUpdate(BaseModel):
         data.update({
             "soul_id": self.soul.id if self.soul else None,
             "soul_full_name": self.soul.get_full_name() if self.soul else None,
+            "author_id": self.author.id if self.author else None,
+            "author_full_name": str(self.author.get_full_name()) if self.author else None,
         })
         return data

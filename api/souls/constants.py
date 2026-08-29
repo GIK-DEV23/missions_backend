@@ -14,3 +14,17 @@ class ContactOutcome(TextChoices):
     BORN_AGAIN = "born_again", _("Born again")
     ALREADY_BELIEVER = "already_believer", _("Already believer")
     NOT_YET = "not_yet", _("Not yet")
+
+
+class ProgressUpdateType(TextChoices):
+    CALL = "call", _("Call")
+    WHATSAPP = "whatsapp", _("WhatsApp")
+    VISIT = "visit", _("Visit")
+    SERVICE = "service", _("Service")
+    NOTE = "note", _("Note")
+
+
+class ProgressUpdateOutcome(TextChoices):
+    REACHED = "reached", _("Reached")
+    NO_ANSWER = "no_answer", _("No answer")
+    RESCHEDULED = "rescheduled", _("Rescheduled")
