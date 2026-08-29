@@ -1,4 +1,5 @@
 import datetime
+import uuid
 from enum import Enum
 from typing import Optional
 
@@ -43,6 +44,7 @@ class SoulsQuery(BaseQuery):
 
 class SoulCreate(Schema):
     """Schema for creating a soul."""
+    client_id: Optional[uuid.UUID] = None
     first_name: str
     last_name: str
     phone_number: str
@@ -85,6 +87,7 @@ class SoulUploadIn(Schema):
 
 class SoulOut(BaseOut):
     """Schema for soul output."""
+    client_id: Optional[str] = None
     first_name: str
     last_name: str
     phone_number: str
@@ -111,13 +114,16 @@ class SoulDetailsOut(SoulOut):
 
 class ProgressUpdateCreate(Schema):
     """Schema for creating a progress update."""
-    soul_id: int
+    client_id: Optional[uuid.UUID] = None
+    soul_id: Optional[int] = None
+    soul_client_id: Optional[uuid.UUID] = None
     content: str
     update_date: Optional[datetime.date] = None
 
 
 class ProgressUpdateOut(BaseOut):
     """Schema for progress update output."""
+    client_id: Optional[str] = None
     soul_id: int
     content: str
     update_date: datetime.date
