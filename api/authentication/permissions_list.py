@@ -69,6 +69,10 @@ ALL_PERMISSIONS = {
     "view_exec_dashboard",
     "sync_mutations",
     "sync_changes",
+    "list_personal_missions",
+    "create_personal_mission",
+    "update_personal_mission",
+    "archive_personal_mission",
 }
 
 # Permission templates for different roles
@@ -109,6 +113,10 @@ MISSIONER_PERMISSIONS = {
     "update_testimony",
     "sync_mutations",
     "sync_changes",
+    "list_personal_missions",
+    "create_personal_mission",
+    "update_personal_mission",
+    "archive_personal_mission",
 }
 
 STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
