@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "souls",
     "testimonies",
     "audit_logs",
+    "sync",
 ]
 
 MIDDLEWARE = [
