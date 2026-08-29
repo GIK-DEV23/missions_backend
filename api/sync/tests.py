@@ -39,7 +39,9 @@ def _soul_payload(**overrides):
 
 class ApplyMutationTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="missioner@example.com", password="pass12345")
+        self.user = User.objects.create_user(
+            email="missioner@example.com", password="pass12345", is_superuser=True
+        )
 
     def test_create_soul_applied(self):
         client_id = uuid.uuid4()
@@ -81,6 +83,14 @@ class ApplyMutationTests(TestCase):
         result = services.apply_mutation(self.user, _mutation(entity="not_a_real_entity"))
         self.assertEqual(result["status"], SyncMutationStatus.REJECTED)
 
+    def test_delete_reports_the_deleted_id(self):
+        client_id = uuid.uuid4()
+        created = services.apply_mutation(self.user, _mutation(client_id=client_id, payload=_soul_payload()))
+        deleted = services.apply_mutation(self.user, _mutation(client_id=client_id, op=SyncOp.DELETE))
+        self.assertEqual(deleted["status"], SyncMutationStatus.APPLIED)
+        self.assertEqual(deleted["id"], created["id"])
+        self.assertIsNotNone(deleted["id"])
+
     def test_one_bad_mutation_does_not_roll_back_others(self):
         mutations = [
             _mutation(payload=_soul_payload(phone_number="+254700000031")),
@@ -93,6 +103,10 @@ class ApplyMutationTests(TestCase):
         self.assertEqual(results[2]["status"], SyncMutationStatus.APPLIED)
         self.assertEqual(Soul.objects.count(), 2)
         self.assertEqual(SyncMutation.objects.count(), 3)
+
+    def test_oversized_entity_string_is_rejected_not_crashed(self):
+        result = services.apply_mutation(self.user, _mutation(entity="x" * 500))
+        self.assertEqual(result["status"], SyncMutationStatus.REJECTED)
 
 
 class VisibleSoulsTests(TestCase):
@@ -126,8 +140,8 @@ class OwnershipRestrictionTests(TestCase):
         self.owner = User.objects.create_user(email="owner2@example.com", password="pass12345")
         self.missioner = User.objects.create_user(email="missioner2@example.com", password="pass12345")
         self.staff_user = User.objects.create_user(email="staff2@example.com", password="pass12345")
-        self.missioner.roles.add(Role.objects.create(name="missioner_template", permissions=[]))
-        self.staff_user.roles.add(Role.objects.create(name="staff", permissions=[]))
+        self.missioner.roles.add(Role.objects.create(name="missioner_template", permissions=["update_soul"]))
+        self.staff_user.roles.add(Role.objects.create(name="staff", permissions=["update_soul"]))
         self.soul = Soul.objects.create(
             client_id=uuid.uuid4(), user=self.owner, is_personal=False,
             **_soul_payload(phone_number="+254700000051")
@@ -143,4 +157,22 @@ class OwnershipRestrictionTests(TestCase):
         result = services.apply_mutation(self.staff_user, _mutation(
             client_id=self.soul.client_id, op=SyncOp.UPDATE, payload={"description": "hi"}
         ))
+        self.assertEqual(result["status"], SyncMutationStatus.APPLIED)
+
+
+class PermissionGateTests(TestCase):
+    """Sync enforces the same per-operation permission the direct REST endpoint would."""
+
+    def setUp(self):
+        self.no_perms_user = User.objects.create_user(email="noperm@example.com", password="pass12345")
+        self.authorized_user = User.objects.create_user(email="authorized@example.com", password="pass12345")
+        self.authorized_user.roles.add(Role.objects.create(name="missioner_template2", permissions=["create_soul"]))
+
+    def test_user_without_create_soul_permission_is_rejected(self):
+        result = services.apply_mutation(self.no_perms_user, _mutation(payload=_soul_payload()))
+        self.assertEqual(result["status"], SyncMutationStatus.REJECTED)
+        self.assertIn("Permission denied", result["error"])
+
+    def test_user_with_create_soul_permission_is_applied(self):
+        result = services.apply_mutation(self.authorized_user, _mutation(payload=_soul_payload()))
         self.assertEqual(result["status"], SyncMutationStatus.APPLIED)
