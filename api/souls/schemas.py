@@ -6,7 +6,7 @@ from typing import Optional
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import JourneyStage, ContactOutcome
+from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -107,6 +107,8 @@ class SoulOut(BaseOut):
     user_full_name: Optional[str] = None
     soul_full_name: str
     description: Optional[str] = None
+    next_check_in_at: Optional[str] = None
+    last_contacted_at: Optional[str] = None
 
 
 class SoulDetailsOut(SoulOut):
@@ -120,16 +122,25 @@ class ProgressUpdateCreate(Schema):
     client_id: Optional[uuid.UUID] = None
     soul_id: Optional[int] = None
     soul_client_id: Optional[uuid.UUID] = None
+    author_id: Optional[int] = None
     content: str
     update_date: Optional[datetime.date] = None
+    type: Optional[ProgressUpdateType] = None
+    outcome: Optional[ProgressUpdateOutcome] = None
+    next_check_in_at: Optional[datetime.datetime] = None
 
 
 class ProgressUpdateOut(BaseOut):
     """Schema for progress update output."""
     client_id: Optional[str] = None
     soul_id: int
+    author_id: Optional[int] = None
+    author_full_name: Optional[str] = None
     content: str
     update_date: datetime.date
+    type: Optional[str] = None
+    outcome: Optional[str] = None
+    next_check_in_at: Optional[str] = None
     soul_full_name: Optional[str] = None
 
 

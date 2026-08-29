@@ -107,10 +107,20 @@ def create_progress_update(data: dict) -> ProgressUpdate:
     if not soul_id:
         raise CustomValidationError("Either soul_id or soul_client_id is required")
     soul = get_soul(soul_id)
+    author_id = data.pop("author_id", None)
+    if author_id is not None:
+        data["author"] = user_details(author_id)
+    next_check_in_at = data.get("next_check_in_at")
     try:
         progress_update = ProgressUpdate(soul=soul, **data)
         progress_update.full_clean()
         progress_update.save()
+        soul_update_fields = ["last_contacted_at"]
+        soul.last_contacted_at = progress_update.created_at
+        if next_check_in_at:
+            soul.next_check_in_at = next_check_in_at
+            soul_update_fields.append("next_check_in_at")
+        soul.save(update_fields=soul_update_fields)
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -123,11 +133,18 @@ def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdat
     try:
         data = resolve_fk_by_client_id(data, "soul", Soul)
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        author_id = data.pop("author_id", None)
+        if author_id is not None:
+            data["author"] = user_details(author_id)
+        next_check_in_at = data.get("next_check_in_at")
         for key, value in data.items():
             if value is not None:
                 setattr(progress_update, key, value)
         progress_update.full_clean()
         progress_update.save()
+        if next_check_in_at:
+            progress_update.soul.next_check_in_at = next_check_in_at
+            progress_update.soul.save(update_fields=["next_check_in_at"])
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")
     except ValidationError as e:
@@ -141,7 +158,11 @@ def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdat
 def delete_progress_update(progress_update_id: int) -> ProgressUpdate:
     try:
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        soul = progress_update.soul
         progress_update.delete()
+        latest = soul.progress_updates.order_by("-created_at").first()
+        soul.last_contacted_at = latest.created_at if latest else None
+        soul.save(update_fields=["last_contacted_at"])
         return progress_update
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")

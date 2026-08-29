@@ -1,3 +1,4 @@
+import datetime as dt
 import importlib
 import uuid
 
@@ -5,7 +6,7 @@ from django.test import TestCase
 
 from base.utils.exceptions import CustomValidationError
 from souls import services
-from souls.constants import JourneyStage, ContactOutcome
+from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
 from souls.models import Soul
 from users.constants import GenderType, AgeGroupCategory
 from users.models import User
@@ -146,3 +147,92 @@ class JourneyStageAndContactOutcomeTests(TestCase):
         migration.migrate_status_values(_FakeApps(), None)
         soul.refresh_from_db()
         self.assertEqual(soul.status, JourneyStage.GROWING)
+
+
+class ProgressUpdateDetailsTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            email="author@example.com",
+            password="pass1234",
+            username="author",
+            first_name="Author",
+            last_name="User",
+        )
+        self.soul = services.create_soul({
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone_number": "+254700000009",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        })
+
+    def test_create_progress_update_sets_author_type_outcome(self):
+        progress_update = services.create_progress_update({
+            "soul_id": self.soul.id,
+            "author_id": self.author.id,
+            "content": "Called",
+            "update_date": "2026-01-05",
+            "type": ProgressUpdateType.CALL,
+            "outcome": ProgressUpdateOutcome.REACHED,
+        })
+        self.assertEqual(progress_update.author_id, self.author.id)
+        self.assertEqual(progress_update.type, ProgressUpdateType.CALL)
+        self.assertEqual(progress_update.outcome, ProgressUpdateOutcome.REACHED)
+
+    def test_create_progress_update_sets_last_contacted_at(self):
+        self.assertIsNone(self.soul.last_contacted_at)
+        services.create_progress_update({
+            "soul_id": self.soul.id,
+            "content": "Called",
+            "update_date": "2026-01-05",
+        })
+        self.soul.refresh_from_db()
+        self.assertIsNotNone(self.soul.last_contacted_at)
+
+    def test_next_check_in_at_writes_through_to_soul_on_create(self):
+        next_check_in = dt.datetime(2026, 2, 1, 9, 0, tzinfo=dt.timezone.utc)
+        services.create_progress_update({
+            "soul_id": self.soul.id,
+            "content": "Called",
+            "update_date": "2026-01-05",
+            "next_check_in_at": next_check_in,
+        })
+        self.soul.refresh_from_db()
+        self.assertEqual(self.soul.next_check_in_at, next_check_in)
+
+    def test_next_check_in_at_writes_through_to_soul_on_update(self):
+        progress_update = services.create_progress_update({
+            "soul_id": self.soul.id,
+            "content": "Called",
+            "update_date": "2026-01-05",
+        })
+        next_check_in = dt.datetime(2026, 3, 1, 9, 0, tzinfo=dt.timezone.utc)
+        services.update_progress_update(progress_update.id, {
+            "next_check_in_at": next_check_in,
+        })
+        self.soul.refresh_from_db()
+        self.assertEqual(self.soul.next_check_in_at, next_check_in)
+
+    def test_delete_recomputes_last_contacted_at(self):
+        first = services.create_progress_update({
+            "soul_id": self.soul.id,
+            "content": "First call",
+            "update_date": "2026-01-01",
+        })
+        second = services.create_progress_update({
+            "soul_id": self.soul.id,
+            "content": "Second call",
+            "update_date": "2026-01-05",
+        })
+        self.soul.refresh_from_db()
+        self.assertEqual(self.soul.last_contacted_at, second.created_at)
+
+        services.delete_progress_update(second.id)
+        self.soul.refresh_from_db()
+        self.assertEqual(self.soul.last_contacted_at, first.created_at)
+
+        services.delete_progress_update(first.id)
+        self.soul.refresh_from_db()
+        self.assertIsNone(self.soul.last_contacted_at)
