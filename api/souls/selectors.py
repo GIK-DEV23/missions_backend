@@ -23,6 +23,15 @@ def get_soul(soul_id: int):
         raise CustomValidationError("Soul with ID {} does not exist".format(soul_id))
 
 
+def get_soul_by_client_id(client_id):
+    """Retrieve a soul by its client_id."""
+
+    try:
+        return Soul.objects.get(client_id=client_id)
+    except Soul.DoesNotExist:
+        raise CustomValidationError("Soul with client_id {} does not exist".format(client_id))
+
+
 def list_souls(
     user,
     filters: Optional[Dict[str, Any]] = None,

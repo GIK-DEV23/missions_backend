@@ -14,10 +14,10 @@ from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.file_parser import FileParser
-from base.utils.helpers import validate_date
+from base.utils.helpers import validate_date, resolve_fk_by_client_id
 from missions.selectors import location_details, mission_details
 from souls.models import Soul, ProgressUpdate
-from souls.selectors import get_soul
+from souls.selectors import get_soul, get_soul_by_client_id
 from users.constants import GenderType, AgeGroupCategory
 from users.models import User
 from users.selectors import user_details
@@ -51,6 +51,9 @@ def create_soul(data) -> Soul:
 def update_soul(user, soul_id, data) -> Soul:
     try:
         soul = get_soul(soul_id)
+        new_contact_outcome = data.get("contact_outcome")
+        if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
+            raise CustomValidationError("contact_outcome is immutable once set")
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:
@@ -99,7 +102,10 @@ def delete_soul(user, soul_id) -> Soul:
 
 
 def create_progress_update(data: dict) -> ProgressUpdate:
-    soul_id = data.pop("soul_id")
+    data = resolve_fk_by_client_id(data, "soul", Soul)
+    soul_id = data.pop("soul_id", None)
+    if not soul_id:
+        raise CustomValidationError("Either soul_id or soul_client_id is required")
     soul = get_soul(soul_id)
     try:
         progress_update = ProgressUpdate(soul=soul, **data)
@@ -115,6 +121,7 @@ def create_progress_update(data: dict) -> ProgressUpdate:
 
 def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdate:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
         for key, value in data.items():
             if value is not None:
@@ -241,12 +248,15 @@ def upload_souls(user, file, mission_id: int, location_id: int):
 
 
 def progress_update_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
-    soul_id = kwargs.get("progress_update_in").soul_id if "progress_update_in" in kwargs else kwargs.get("soul_id")
-    if not soul_id:
+    progress_update_in = kwargs.get("progress_update_in")
+    soul_id = progress_update_in.soul_id if progress_update_in else kwargs.get("soul_id")
+    soul_client_id = progress_update_in.soul_client_id if progress_update_in else None
+    if soul_id:
+        soul = get_soul(soul_id)
+    elif soul_client_id:
+        soul = get_soul_by_client_id(soul_client_id)
+    else:
         return None
-    soul = get_soul(soul_id)
     if not soul.user or soul.user.pk != user.pk:
         raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None

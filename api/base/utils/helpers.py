@@ -101,6 +101,24 @@ def serialize_types(
     return data
 
 
+def resolve_fk_by_client_id(data: dict, field: str, model: Type[models.Model]) -> dict:
+    """
+    Resolve '{field}_client_id' to '{field}_id' in-place when the numeric id
+    wasn't given, for FKs to records that may only exist offline so far.
+    """
+    id_key = f"{field}_id"
+    client_key = f"{field}_client_id"
+    client_id = data.pop(client_key, None)
+    if data.get(id_key) is None and client_id:
+        try:
+            data[id_key] = model.objects.only("id").get(client_id=client_id).id
+        except model.DoesNotExist:
+            raise CustomValidationError(
+                "No {} found for client_id '{}'".format(model.__name__.lower(), client_id)
+            )
+    return data
+
+
 def validate_date(value, row):
     """
     Validate and normalize a date value.

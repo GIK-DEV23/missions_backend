@@ -5,15 +5,18 @@ from typing import Optional
 from django.core.exceptions import ValidationError
 
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.helpers import resolve_fk_by_client_id
 from testimonies.models import Testimony, Miracle
 from testimonies.selectors import testimony_details, miracle_details
 from users.selectors import user_details
+from souls.models import Soul
 from souls.selectors import get_soul
 from missions.selectors import mission_details
 
 
 def create_testimony(data: dict) -> Testimony:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         soul_id = data.get('soul_id')
         user_id = data.get('user_id')
         mission_id = data.get('mission_id')
@@ -85,6 +88,7 @@ def delete_testimony(testimony_id: int) -> Testimony:
 
 def create_miracle(data: dict) -> Miracle:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         soul_id = data.get('soul_id')
         user_id = data.get('user_id')
         mission_id = data.get('mission_id')
@@ -150,12 +154,13 @@ def delete_miracle(miracle_id: int) -> Miracle:
 
 
 def miracle_and_testimony_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
-
-    soul_id = kwargs.get('testimony_in', {}).soul_id or \
-              kwargs.get('miracle_in', {}).soul_id or \
-              kwargs.get('soul_id')
+    testimony_in = kwargs.get('testimony_in')
+    miracle_in = kwargs.get('miracle_in')
+    soul_id = (
+        (testimony_in.soul_id if testimony_in else None)
+        or (miracle_in.soul_id if miracle_in else None)
+        or kwargs.get('soul_id')
+    )
 
     if not soul_id:
         return None
