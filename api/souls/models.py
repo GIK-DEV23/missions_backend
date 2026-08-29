@@ -5,7 +5,7 @@ from django.http import HttpRequest
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel, client_id_field
-from souls.constants import SoulStatus
+from souls.constants import JourneyStage, ContactOutcome
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -15,7 +15,8 @@ class Soul(BaseModel):
     last_name = models.CharField(max_length=100)
     phone_number = PhoneNumberField()
     location = models.ForeignKey("missions.Location", on_delete=models.SET_NULL, null=True, blank=True, related_name='souls')
-    status = models.CharField(max_length=50, choices=SoulStatus.choices, default=SoulStatus.NEW_CONVERT)
+    status = models.CharField(max_length=50, choices=JourneyStage.choices, default=JourneyStage.NEW_BELIEVER)
+    contact_outcome = models.CharField(max_length=30, choices=ContactOutcome.choices, null=True, blank=True)
     date_added = models.DateField()
     mission = models.ForeignKey("missions.Mission", on_delete=models.PROTECT, null=True, blank=True, related_name='souls')
     is_personal = models.BooleanField(default=False)
