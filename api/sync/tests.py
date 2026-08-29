@@ -117,3 +117,30 @@ class VisibleSoulsTests(TestCase):
         ids = set(selectors.visible_souls(self.staff_user).values_list("id", flat=True))
         self.assertIn(self.official_soul.id, ids)
         self.assertNotIn(self.personal_soul.id, ids)
+
+
+class OwnershipRestrictionTests(TestCase):
+    """A missioner-only user can only touch their own souls via sync; staff can touch anyone's."""
+
+    def setUp(self):
+        self.owner = User.objects.create_user(email="owner2@example.com", password="pass12345")
+        self.missioner = User.objects.create_user(email="missioner2@example.com", password="pass12345")
+        self.staff_user = User.objects.create_user(email="staff2@example.com", password="pass12345")
+        self.missioner.roles.add(Role.objects.create(name="missioner_template", permissions=[]))
+        self.staff_user.roles.add(Role.objects.create(name="staff", permissions=[]))
+        self.soul = Soul.objects.create(
+            client_id=uuid.uuid4(), user=self.owner, is_personal=False,
+            **_soul_payload(phone_number="+254700000051")
+        )
+
+    def test_missioner_cannot_update_soul_they_do_not_own(self):
+        result = services.apply_mutation(self.missioner, _mutation(
+            client_id=self.soul.client_id, op=SyncOp.UPDATE, payload={"description": "hi"}
+        ))
+        self.assertEqual(result["status"], SyncMutationStatus.REJECTED)
+
+    def test_staff_can_update_soul_they_do_not_own(self):
+        result = services.apply_mutation(self.staff_user, _mutation(
+            client_id=self.soul.client_id, op=SyncOp.UPDATE, payload={"description": "hi"}
+        ))
+        self.assertEqual(result["status"], SyncMutationStatus.APPLIED)
