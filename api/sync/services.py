@@ -2,6 +2,7 @@ import logging
 
 from django.db import transaction, IntegrityError
 
+from authentication.permissions import has_role_type
 from base.utils.exceptions import CustomValidationError
 from souls import services as soul_services
 from souls.models import Soul, ProgressUpdate
@@ -11,6 +12,17 @@ from sync.constants import SyncEntity, SyncOp, SyncMutationStatus
 from sync.models import SyncMutation
 
 logger = logging.getLogger(__name__)
+
+
+def _is_restricted_to_own_records(user) -> bool:
+    """Mirrors require_permission's gating: the ownership check only applies
+    when every role the user holds is missioner_template (never for admins/staff/exec)."""
+    if user.is_superuser or has_role_type("superuser", user=user) or has_role_type("admin", user=user):
+        return False
+    role_names = [r.name.lower() for r in user.roles.all()]
+    if not role_names:
+        return False
+    return all(name == "missioner_template" for name in role_names)
 
 
 class SyncConflict(Exception):
@@ -25,7 +37,8 @@ def _handle_soul(user, op, client_id, payload):
     soul = Soul.objects.filter(client_id=client_id).first()
     if not soul:
         raise SyncConflict("No soul found for client_id '{}'".format(client_id))
-    soul_services.missioner_soul_operations_handler(user, {"soul_id": soul.id})
+    if _is_restricted_to_own_records(user):
+        soul_services.missioner_soul_operations_handler(user, {"soul_id": soul.id})
 
     if op == SyncOp.UPDATE:
         return soul_services.update_soul(user=user, soul_id=soul.id, data=payload)
@@ -42,7 +55,8 @@ def _handle_check_in(user, op, client_id, payload):
     progress_update = ProgressUpdate.objects.filter(client_id=client_id).first()
     if not progress_update:
         raise SyncConflict("No check-in found for client_id '{}'".format(client_id))
-    soul_services.progress_update_handler(user, {"soul_id": progress_update.soul_id})
+    if _is_restricted_to_own_records(user):
+        soul_services.progress_update_handler(user, {"soul_id": progress_update.soul_id})
 
     if op == SyncOp.UPDATE:
         return soul_services.update_progress_update(progress_update.id, payload)
@@ -59,7 +73,8 @@ def _handle_testimony(user, op, client_id, payload):
     testimony = Testimony.objects.filter(client_id=client_id).first()
     if not testimony:
         raise SyncConflict("No testimony found for client_id '{}'".format(client_id))
-    testimony_services.miracle_and_testimony_handler(user, {"soul_id": testimony.soul_id})
+    if _is_restricted_to_own_records(user):
+        testimony_services.miracle_and_testimony_handler(user, {"soul_id": testimony.soul_id})
 
     if op == SyncOp.UPDATE:
         return testimony_services.update_testimony(testimony.id, payload)
@@ -76,7 +91,8 @@ def _handle_miracle(user, op, client_id, payload):
     miracle = Miracle.objects.filter(client_id=client_id).first()
     if not miracle:
         raise SyncConflict("No miracle found for client_id '{}'".format(client_id))
-    testimony_services.miracle_and_testimony_handler(user, {"soul_id": miracle.soul_id})
+    if _is_restricted_to_own_records(user):
+        testimony_services.miracle_and_testimony_handler(user, {"soul_id": miracle.soul_id})
 
     if op == SyncOp.UPDATE:
         return testimony_services.update_miracle(miracle.id, payload)
