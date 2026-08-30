@@ -78,6 +78,8 @@ ALL_PERMISSIONS = {
     "create_personal_mission",
     "update_personal_mission",
     "archive_personal_mission",
+    "list_notifications",
+    "mark_notification_read",
 }
 
 # Permission templates for different roles
@@ -122,6 +124,8 @@ MISSIONER_PERMISSIONS = {
     "create_personal_mission",
     "update_personal_mission",
     "archive_personal_mission",
+    "list_notifications",
+    "mark_notification_read",
 }
 
 STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
@@ -212,6 +216,8 @@ EXEC_PERMISSIONS = {
     "view_jia_participant",
     "list_jia_participants",
     "sync_changes",
+    "list_notifications",
+    "mark_notification_read",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS
