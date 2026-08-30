@@ -9,7 +9,7 @@ from missions.constants import EventType
 from missions.filters import LocationFilter, MissionFilter, MissionJIAFilter, ReportsFilter, MissionGalleryFilter
 from missions.models import MissionCategory, Location, Mission, MissionJIAParticipant, Report, MissionGallery
 
-from souls.constants import SoulStatus
+from souls.constants import JourneyStage
 
 
 def location_details(location_id: int) -> Location:
@@ -92,8 +92,8 @@ def mission_details(mission_id: int) -> Mission:
         mission = (
             Mission.objects
             .annotate(
-                souls_won_count=Count("souls", filter=Q(souls__status=SoulStatus.NEW_CONVERT)),
-                souls_followup_count=Count("souls", filter=Q(souls__status=SoulStatus.FOLLOW_UP)),
+                souls_won_count=Count("souls", filter=Q(souls__status=JourneyStage.NEW_BELIEVER)),
+                souls_followup_count=Count("souls", filter=Q(souls__status=JourneyStage.GROWING)),
                 participants_count=Count("participants", filter=Q(participants__is_archived=False)),
             )
             .select_related("category", "location")
@@ -123,8 +123,8 @@ def missions_list(filters: Optional[Dict[str, Any]] = None) -> models.QuerySet:
         .filter(is_archived=False)
         .select_related('category', 'location')
         .annotate(
-            souls_won_count=Count("souls", filter=Q(souls__status=SoulStatus.NEW_CONVERT)),
-            souls_followup_count=Count("souls", filter=Q(souls__status=SoulStatus.FOLLOW_UP)),
+            souls_won_count=Count("souls", filter=Q(souls__status=JourneyStage.NEW_BELIEVER)),
+            souls_followup_count=Count("souls", filter=Q(souls__status=JourneyStage.GROWING)),
         )
         .order_by('-start_date')
     )

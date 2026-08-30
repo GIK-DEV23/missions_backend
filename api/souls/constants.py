@@ -2,7 +2,29 @@ from django.db.models import TextChoices
 from django.utils.translation import gettext_lazy as _
 
 
-class SoulStatus(TextChoices):
-    ACTIVE = "active", _("Active")
-    NEW_CONVERT = "new_convert", _("New convert")
-    FOLLOW_UP = "follow_up", _("Follow up")
+class JourneyStage(TextChoices):
+    NOT_YET_SAVED = "not_yet_saved", _("Not yet saved")
+    NEW_BELIEVER = "new_believer", _("New believer")
+    GROWING = "growing", _("Growing")
+    ROOTED = "rooted", _("Rooted")
+    IN_A_CHURCH = "in_a_church", _("In a church")
+
+
+class ContactOutcome(TextChoices):
+    BORN_AGAIN = "born_again", _("Born again")
+    ALREADY_BELIEVER = "already_believer", _("Already believer")
+    NOT_YET = "not_yet", _("Not yet")
+
+
+class ProgressUpdateType(TextChoices):
+    CALL = "call", _("Call")
+    WHATSAPP = "whatsapp", _("WhatsApp")
+    VISIT = "visit", _("Visit")
+    SERVICE = "service", _("Service")
+    NOTE = "note", _("Note")
+
+
+class ProgressUpdateOutcome(TextChoices):
+    REACHED = "reached", _("Reached")
+    NO_ANSWER = "no_answer", _("No answer")
+    RESCHEDULED = "rescheduled", _("Rescheduled")

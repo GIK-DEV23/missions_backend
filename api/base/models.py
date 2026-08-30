@@ -48,11 +48,22 @@ class ToDictMixin:
             elif isinstance(field, PhoneNumberField):
                 data[field.name] = str(data[field.name])
 
+            elif isinstance(field, models.UUIDField):
+                if data[field.name]:
+                    data[field.name] = str(data[field.name])
+
         # Tack on the url for good measure
         if hasattr(self, "get_absolute_url"):
             data["url"] = self.get_absolute_url()  # type: ignore
 
         return data
+
+
+def client_id_field(**overrides):
+    """UUID an offline client assigns a record at creation time, before it has a server id."""
+    options = dict(null=True, blank=True, unique=True, db_index=True)
+    options.update(overrides)
+    return models.UUIDField(**options)
 
 
 class BaseModel(models.Model, ToDictMixin):
