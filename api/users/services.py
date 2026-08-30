@@ -193,6 +193,26 @@ def activate_user(user_id: int) -> User:
     return user
 
 
+def update_own_profile(user: User, data: dict) -> User:
+    """Self-serve profile update — only touches fields a user may set on themselves.
+
+    `data` is expected from `.dict(exclude_unset=True)` — every key present
+    was deliberately provided, including explicit nulls, so they're all
+    applied (no `is not None` guard; see personal_missions ticket for why
+    that guard is wrong when the caller already filtered to explicit keys).
+    """
+    try:
+        for key, value in data.items():
+            setattr(user, key, value)
+        user.full_clean()
+        user.save()
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError("Error updating profile: {}".format(e))
+    return user
+
+
 def missioner_restriction_handler(user, kwargs):
     """
     Restriction handler for missioner role.

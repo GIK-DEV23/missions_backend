@@ -46,7 +46,8 @@ class ToDictMixin:
                     data[field.name] = None
 
             elif isinstance(field, PhoneNumberField):
-                data[field.name] = str(data[field.name])
+                if data[field.name]:
+                    data[field.name] = str(data[field.name])
 
             elif isinstance(field, models.UUIDField):
                 if data[field.name]:

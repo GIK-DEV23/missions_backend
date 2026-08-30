@@ -88,3 +88,12 @@ class AuthProviderListResponse(Schema):
 class TokenRefreshIn(Schema):
     """Schema for token refresh requests."""
     access_token: str = Field(..., description="The refresh token to obtain a new access token.")
+
+
+class RequestPasswordResetIn(Schema):
+    email: EmailStr
+
+
+class ResetPasswordIn(Schema):
+    token: str
+    new_password: str
