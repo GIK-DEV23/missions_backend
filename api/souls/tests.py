@@ -236,3 +236,106 @@ class ProgressUpdateDetailsTests(TestCase):
         services.delete_progress_update(first.id)
         self.soul.refresh_from_db()
         self.assertIsNone(self.soul.last_contacted_at)
+
+
+class ConsentDuplicateAndMergeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="carer@example.com",
+            password="pass1234",
+            username="carer",
+            first_name="Carer",
+            last_name="User",
+        )
+
+    def _soul_data(self, **overrides):
+        data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone_number": "+254700000020",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        }
+        data.update(overrides)
+        return data
+
+    def test_consent_recorded_at_stamped_when_consent_given_on_create(self):
+        soul = services.create_soul(self._soul_data(consent_given=True))
+        self.assertIsNotNone(soul.consent_recorded_at)
+
+    def test_consent_recorded_at_not_stamped_without_consent(self):
+        soul = services.create_soul(self._soul_data())
+        self.assertIsNone(soul.consent_recorded_at)
+
+    def test_explicit_consent_recorded_at_respected(self):
+        explicit = dt.datetime(2025, 6, 1, tzinfo=dt.timezone.utc)
+        soul = services.create_soul(self._soul_data(consent_given=True, consent_recorded_at=explicit))
+        self.assertEqual(soul.consent_recorded_at, explicit)
+
+    def test_do_not_contact_at_stamped_on_update(self):
+        soul = services.create_soul(self._soul_data())
+        self.assertIsNone(soul.do_not_contact_at)
+        updated = services.update_soul(self.user, soul.id, {"do_not_contact": True})
+        self.assertIsNotNone(updated.do_not_contact_at)
+
+    def test_second_soul_with_same_phone_flagged_as_duplicate(self):
+        original = services.create_soul(self._soul_data())
+        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        self.assertEqual(duplicate.possible_duplicate_of_id, original.id)
+        self.assertIsNone(original.possible_duplicate_of_id)
+
+    def test_unique_phone_not_flagged(self):
+        soul = services.create_soul(self._soul_data(phone_number="+254700000021"))
+        self.assertIsNone(soul.possible_duplicate_of_id)
+
+    def test_update_resolves_location_mission_user_fks(self):
+        from missions.models import Location, MissionCategory, Mission
+        from missions.constants import LocationCategoryType
+
+        location = Location.objects.create(name="Nairobi", category=LocationCategoryType.TOWN, description="Capital")
+        soul = services.create_soul(self._soul_data())
+        updated = services.update_soul(self.user, soul.id, {"location": location.id, "user": self.user.id})
+        self.assertEqual(updated.location_id, location.id)
+        self.assertEqual(updated.user_id, self.user.id)
+
+    def test_merge_reassigns_progress_updates_and_tombstones_duplicate(self):
+        original = services.create_soul(self._soul_data())
+        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        pu = services.create_progress_update({
+            "soul_id": duplicate.id,
+            "content": "Called",
+            "update_date": "2026-01-02",
+        })
+
+        survivor = services.merge_souls(self.user, duplicate.id, original.id)
+
+        self.assertEqual(survivor.id, original.id)
+        pu.refresh_from_db()
+        self.assertEqual(pu.soul_id, original.id)
+        duplicate.refresh_from_db()
+        self.assertIsNotNone(duplicate.deleted_at)
+
+    def test_merge_clears_survivor_possible_duplicate_of(self):
+        original = services.create_soul(self._soul_data())
+        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        self.assertEqual(duplicate.possible_duplicate_of_id, original.id)
+
+        survivor = services.merge_souls(self.user, original.id, duplicate.id)
+        self.assertIsNone(survivor.possible_duplicate_of_id)
+
+    def test_merged_soul_no_longer_resolvable(self):
+        from souls.selectors import get_soul
+
+        original = services.create_soul(self._soul_data())
+        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        services.merge_souls(self.user, duplicate.id, original.id)
+
+        with self.assertRaises(CustomValidationError):
+            get_soul(duplicate.id)
+
+    def test_cannot_merge_soul_into_itself(self):
+        soul = services.create_soul(self._soul_data())
+        with self.assertRaises(CustomValidationError):
+            services.merge_souls(self.user, soul.id, soul.id)

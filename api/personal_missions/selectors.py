@@ -11,3 +11,11 @@ def get_personal_mission(user, personal_mission_id: int) -> PersonalMission:
 
 def list_personal_missions(user):
     return PersonalMission.objects.filter(owner=user)
+
+
+def personal_mission_details(personal_mission_id: int) -> PersonalMission:
+    """Non-owner-scoped lookup for other apps linking to a personal mission by FK."""
+    try:
+        return PersonalMission.objects.get(id=personal_mission_id)
+    except PersonalMission.DoesNotExist:
+        raise CustomValidationError("PersonalMission with ID {} does not exist".format(personal_mission_id))

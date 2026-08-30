@@ -55,9 +55,14 @@ class SoulCreate(Schema):
     contact_outcome: Optional[ContactOutcome] = None
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
+    personal_mission: Optional[int] = None
     is_personal: bool = False
     user: Optional[int] = None
     description: Optional[str] = None
+    consent_given: bool = False
+    consent_recorded_at: Optional[datetime.datetime] = None
+    do_not_contact: bool = False
+    do_not_contact_at: Optional[datetime.datetime] = None
 
 
 class SoulUpdate(Schema):
@@ -72,9 +77,14 @@ class SoulUpdate(Schema):
     contact_outcome: Optional[ContactOutcome] = None
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
+    personal_mission: Optional[int] = None
     is_personal: bool = False
     user: Optional[int] = None
     description: Optional[str] = None
+    consent_given: Optional[bool] = None
+    consent_recorded_at: Optional[datetime.datetime] = None
+    do_not_contact: Optional[bool] = None
+    do_not_contact_at: Optional[datetime.datetime] = None
 
 class ProgressUpdateSummary(BaseOut):
     """Schema for progress update output."""
@@ -102,6 +112,7 @@ class SoulOut(BaseOut):
     date_added: datetime.date
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
+    personal_mission_id: Optional[int] = None
     is_personal: bool = False
     user_id: Optional[int] = None
     user_full_name: Optional[str] = None
@@ -109,6 +120,16 @@ class SoulOut(BaseOut):
     description: Optional[str] = None
     next_check_in_at: Optional[str] = None
     last_contacted_at: Optional[str] = None
+    consent_given: bool = False
+    consent_recorded_at: Optional[str] = None
+    do_not_contact: bool = False
+    do_not_contact_at: Optional[str] = None
+    possible_duplicate_of: Optional[int] = None
+
+
+class SoulMergeIn(Schema):
+    """Schema for merging a duplicate soul into another."""
+    into_id: int
 
 
 class SoulDetailsOut(SoulOut):

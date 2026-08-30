@@ -18,27 +18,27 @@ def _is_special_user(user) -> bool:
     )
 
 
-def visible_souls(user):
+def visible_souls(user, include_deleted=False):
     """Personal souls stay visible only to the missioner who owns them."""
     qs = Soul.objects.select_related("location", "mission", "user")
+    if not include_deleted:
+        qs = qs.filter(deleted_at__isnull=True)
     if _is_special_user(user):
         return qs.filter(Q(is_personal=False) | Q(user=user))
     return qs.filter(user=user)
 
 
 def visible_testimonies(user):
-    """Testimony has no is_personal field yet (unlike Soul) — special users see
-    everything, everyone else sees only what they submitted."""
     qs = Testimony.objects.select_related("soul", "user", "mission")
     if _is_special_user(user):
-        return qs
+        return qs.filter(Q(is_personal=False) | Q(user=user))
     return qs.filter(user=user)
 
 
 def visible_miracles(user):
     qs = Miracle.objects.select_related("soul", "user", "mission")
     if _is_special_user(user):
-        return qs
+        return qs.filter(Q(is_personal=False) | Q(user=user))
     return qs.filter(user=user)
 
 
@@ -62,10 +62,19 @@ def changes_since(user, since: Optional[datetime.datetime], request=None) -> dic
         miracles = miracles.filter(updated_at__gte=since)
         progress_updates = progress_updates.filter(updated_at__gte=since)
 
+    deleted_soul_ids = []
+    if since:
+        deleted_soul_ids = list(
+            visible_souls(user, include_deleted=True)
+            .filter(deleted_at__gte=since)
+            .values_list("id", flat=True)
+        )
+
     return {
         "souls": [s.to_dict(request) for s in souls],
         "progress_updates": [p.to_dict(request) for p in progress_updates],
         "testimonies": [t.to_dict(request) for t in testimonies],
         "miracles": [m.to_dict(request) for m in miracles],
+        "deleted": {"souls": deleted_soul_ids},
         "cursor": cursor.isoformat(),
     }

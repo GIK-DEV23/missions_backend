@@ -264,6 +264,8 @@ def apply_mutation(user, mutation: dict) -> dict:
                     obj, result_id = config["create"](user, client_id, payload)
                 else:
                     target = config["model"].objects.filter(client_id=client_id).first()
+                    if target and getattr(target, "deleted_at", None):
+                        target = None
                     if not target:
                         raise SyncConflict("No {} found for client_id '{}'".format(entity, client_id))
                     config["check_ownership"](user, target)

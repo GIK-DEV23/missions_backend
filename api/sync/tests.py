@@ -176,3 +176,49 @@ class PermissionGateTests(TestCase):
     def test_user_with_create_soul_permission_is_applied(self):
         result = services.apply_mutation(self.authorized_user, _mutation(payload=_soul_payload()))
         self.assertEqual(result["status"], SyncMutationStatus.APPLIED)
+
+
+class ChangesSinceDeletedSoulsTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user(email="owner3@example.com", password="pass12345")
+        self.staff_user = User.objects.create_user(email="staff3@example.com", password="pass12345")
+        self.staff_user.roles.add(Role.objects.create(name="staff3", permissions=[]))
+
+    def test_merged_soul_reported_as_deleted_since_the_merge(self):
+        from django.utils import timezone
+        from souls import services as soul_services
+
+        original = soul_services.create_soul(_soul_payload(phone_number="+254700000061", user=self.owner.id))
+        duplicate = soul_services.create_soul(_soul_payload(phone_number="+254700000062", first_name="Janet", user=self.owner.id))
+
+        before_merge = timezone.now()
+        soul_services.merge_souls(self.owner, duplicate.id, original.id)
+
+        changes = selectors.changes_since(self.owner, before_merge)
+        self.assertIn(duplicate.id, changes["deleted"]["souls"])
+        self.assertNotIn(duplicate.id, [s["id"] for s in changes["souls"]])
+
+    def test_no_since_means_no_deleted_list(self):
+        changes = selectors.changes_since(self.owner, None)
+        self.assertEqual(changes["deleted"]["souls"], [])
+
+
+class VisibleTestimoniesTests(TestCase):
+    def setUp(self):
+        from testimonies.models import Testimony
+
+        self.owner = User.objects.create_user(email="owner4@example.com", password="pass12345")
+        self.staff_user = User.objects.create_user(email="staff4@example.com", password="pass12345")
+        self.staff_user.roles.add(Role.objects.create(name="staff4", permissions=[]))
+
+        self.personal = Testimony.objects.create(title="t1", content="c1", user=self.owner, is_personal=True)
+        self.official = Testimony.objects.create(title="t2", content="c2", user=self.owner, is_personal=False)
+
+    def test_staff_does_not_see_personal_testimony(self):
+        ids = set(selectors.visible_testimonies(self.staff_user).values_list("id", flat=True))
+        self.assertIn(self.official.id, ids)
+        self.assertNotIn(self.personal.id, ids)
+
+    def test_owner_sees_both_testimonies(self):
+        ids = set(selectors.visible_testimonies(self.owner).values_list("id", flat=True))
+        self.assertEqual(ids, {self.personal.id, self.official.id})
