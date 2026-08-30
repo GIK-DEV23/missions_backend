@@ -5,8 +5,8 @@ from typing import Optional
 from django.db.models import Q
 
 from base.utils.exceptions import CustomValidationError
-from testimonies.filters import TestimonyFilter, MiracleFilter
-from testimonies.models import Testimony, Miracle
+from testimonies.filters import TestimonyFilter, MiracleFilter, HighlightFilter
+from testimonies.models import Testimony, Miracle, Highlight
 
 
 def testimonies_list(filters: Optional[dict] = None):
@@ -37,3 +37,18 @@ def miracle_details(miracle_id: int) -> Miracle:
         return Miracle.objects.get(id=miracle_id)
     except Miracle.DoesNotExist:
         raise CustomValidationError("Miracle with ID {} does not exist".format(miracle_id))
+
+
+def highlights_list(filters: Optional[dict] = None):
+    qs = Highlight.objects.select_related('soul', 'user', 'mission').all()
+    if not filters:
+        return qs
+
+    return HighlightFilter(filters, queryset=qs).qs
+
+
+def highlight_details(highlight_id: int) -> Highlight:
+    try:
+        return Highlight.objects.get(id=highlight_id)
+    except Highlight.DoesNotExist:
+        raise CustomValidationError("Highlight with ID {} does not exist".format(highlight_id))
