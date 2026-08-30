@@ -147,6 +147,12 @@ class User(AbstractUser, BaseModel):
     # Additional fields
     profile_photo = models.ImageField(upload_to=get_user_photos_dir, null=True, blank=True)
     roles = models.ManyToManyField(Role, related_name='users', blank=True)
+    church = models.CharField(max_length=200, null=True, blank=True)
+    bio = models.TextField(null=True, blank=True)
+    emergency_contact_name = models.CharField(max_length=100, null=True, blank=True)
+    emergency_contact_phone = PhoneNumberField(null=True, blank=True)
+    emergency_contact_confirmed_at = models.DateTimeField(null=True, blank=True)
+    saved_partner = models.JSONField(null=True, blank=True, help_text="{name, gender, traveling_from, dietary}")
 
     # Use email as the unique identifier for authentication
     USERNAME_FIELD = 'email'
