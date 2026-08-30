@@ -7,7 +7,7 @@ from base.utils.exceptions import CustomValidationError
 from souls import services as soul_services
 from souls.models import Soul, ProgressUpdate
 from testimonies import services as testimony_services
-from testimonies.models import Testimony, Miracle
+from testimonies.models import Testimony, Miracle, Highlight
 from sync.constants import SyncEntity, SyncOp, SyncMutationStatus
 from sync.models import SyncMutation
 
@@ -139,6 +139,28 @@ def _check_miracle_ownership(user, target):
         testimony_services.miracle_and_testimony_handler(user, {"soul_id": target.soul_id})
 
 
+def _create_highlight(user, client_id, payload):
+    payload["client_id"] = client_id
+    obj = testimony_services.create_highlight(payload)
+    return obj, obj.id
+
+
+def _update_highlight(user, target, payload):
+    obj = testimony_services.update_highlight(target.id, payload)
+    return obj, obj.id
+
+
+def _delete_highlight(user, target, payload):
+    target_id = target.id
+    testimony_services.delete_highlight(target.id)
+    return None, target_id
+
+
+def _check_highlight_ownership(user, target):
+    if _is_restricted_to_own_records(user):
+        testimony_services.miracle_and_testimony_handler(user, {"soul_id": target.soul_id})
+
+
 ENTITY_REGISTRY = {
     SyncEntity.SOUL: {
         "model": Soul,
@@ -186,6 +208,18 @@ ENTITY_REGISTRY = {
             SyncOp.CREATE: "create_miracle",
             SyncOp.UPDATE: "update_miracle",
             SyncOp.DELETE: "delete_miracle",
+        },
+    },
+    SyncEntity.HIGHLIGHT: {
+        "model": Highlight,
+        "create": _create_highlight,
+        "update": _update_highlight,
+        "delete": _delete_highlight,
+        "check_ownership": _check_highlight_ownership,
+        "permissions": {
+            SyncOp.CREATE: "create_highlight",
+            SyncOp.UPDATE: "update_highlight",
+            SyncOp.DELETE: "delete_highlight",
         },
     },
 }
