@@ -159,6 +159,7 @@ class MissionCreateSchema(Schema):
     registration_fee: Decimal = Decimal(0)
     couple_registration_fee: Decimal = Decimal(0)
     banner_image: str | None = None
+    souls_reached: int | None = None
 
 
 class MissionUpdateSchema(Schema):
@@ -177,6 +178,7 @@ class MissionUpdateSchema(Schema):
     registration_fee: Decimal | None = None
     couple_registration_fee: Decimal | None = None
     banner_image: str | None = None
+    souls_reached: int | None = None
 
 
 class MissionFilterSchema(BaseQuery):
@@ -209,6 +211,7 @@ class MinimalMissionOutSchema(BaseOut):
     couple_registration_fee: Decimal | None = None
     is_registration_open: bool | None = None
     total_souls_won: str | None = None
+    souls_reached: int | None = None
 
 
 class MissionOutSchema(MinimalMissionOutSchema):

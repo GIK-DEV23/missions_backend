@@ -230,7 +230,8 @@ def create_mission(
     registration_fee: Optional[Decimal] = None,
     couple_registration_fee: Optional[Decimal] = None,
     banner_image=None,
-    client_id: Optional[uuid.UUID] = None
+    client_id: Optional[uuid.UUID] = None,
+    souls_reached: Optional[int] = None
 ) -> Mission:
     """
     Create a new mission.
@@ -276,7 +277,8 @@ def create_mission(
         couple_registration_fee=couple_registration_fee,
         banner_image=banner_image,
         created_by=user,
-        client_id=client_id
+        client_id=client_id,
+        souls_reached=souls_reached
     )
     return mission
 

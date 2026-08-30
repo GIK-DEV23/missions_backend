@@ -211,3 +211,25 @@ class ClientIdTests(TestCase):
         mine = list(selectors.my_registrations(self.user))
         self.assertEqual(len(mine), 1)
         self.assertEqual(mine[0].full_name, "Mine")
+
+    def test_create_mission_stores_souls_reached(self):
+        mission = services.create_mission(
+            title="Souls Reached Test",
+            description="Desc",
+            category_id=self.category.id,
+            location_id=self.location.id,
+            start_date=datetime.date(2026, 6, 1),
+            end_date=datetime.date(2026, 6, 1),
+            user=None,
+            souls_reached=500,
+        )
+        self.assertEqual(mission.souls_reached, 500)
+
+    def test_update_mission_changes_souls_reached(self):
+        updated = services.update_mission(
+            user=self.user, update_dict={"souls_reached": 250}, mission_id=self.mission.id
+        )
+        self.assertEqual(updated.souls_reached, 250)
+
+    def test_mission_souls_reached_defaults_to_none(self):
+        self.assertIsNone(self.mission.souls_reached)
