@@ -19,13 +19,15 @@ def _is_special_user(user) -> bool:
 
 
 def visible_souls(user, include_deleted=False):
-    """Personal souls stay visible only to the missioner who owns them."""
+    """Personal souls stay visible to the missioner who recorded them, plus
+    whoever is assigned to or a co-carer for them (shared record access)."""
     qs = Soul.objects.select_related("location", "mission", "user")
     if not include_deleted:
         qs = qs.filter(deleted_at__isnull=True)
+    shared_access = Q(user=user) | Q(assigned_to=user) | Q(co_carers=user)
     if _is_special_user(user):
-        return qs.filter(Q(is_personal=False) | Q(user=user))
-    return qs.filter(user=user)
+        return qs.filter(Q(is_personal=False) | shared_access).distinct()
+    return qs.filter(shared_access).distinct()
 
 
 def visible_testimonies(user):

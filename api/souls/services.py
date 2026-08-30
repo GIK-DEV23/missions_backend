@@ -30,7 +30,12 @@ FK_RESOLVERS = {
     "mission": mission_details,
     "personal_mission": personal_mission_details,
     "user": user_details,
+    "assigned_to": user_details,
 }
+
+
+def _resolve_co_carers(co_carer_ids):
+    return [user_details(uid) for uid in co_carer_ids]
 
 
 def _find_possible_duplicate(phone_number, exclude_id=None) -> Optional[int]:
@@ -49,6 +54,7 @@ def _stamp_consent_and_contact_fields(data: dict, existing_consent_recorded_at=N
 
 
 def create_soul(data) -> Soul:
+    co_carers = data.pop("co_carers", None)
     try:
         for key, resolver in FK_RESOLVERS.items():
             if data.get(key) is not None:
@@ -59,6 +65,8 @@ def create_soul(data) -> Soul:
         soul = Soul(**data)
         soul.full_clean()
         soul.save()
+        if co_carers is not None:
+            soul.co_carers.set(_resolve_co_carers(co_carers))
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -68,6 +76,7 @@ def create_soul(data) -> Soul:
 
 
 def update_soul(user, soul_id, data) -> Soul:
+    co_carers = data.pop("co_carers", None)
     try:
         soul = get_soul(soul_id)
         new_contact_outcome = data.get("contact_outcome")
@@ -85,6 +94,8 @@ def update_soul(user, soul_id, data) -> Soul:
         soul.full_clean()
         changed_fields = {field: (original_fields[field], getattr(soul, field)) for field in data.keys() if original_fields[field] != getattr(soul, field)}
         soul.save()
+        if co_carers is not None:
+            soul.co_carers.set(_resolve_co_carers(co_carers))
         if changed_fields:
             changed_fields_str = ", ".join(f"{field}: '{original}' -> '{new}'" for field, (original, new) in changed_fields.items())
             log_message = f"Soul ID {soul_id} updated. Changes: {changed_fields_str}"
@@ -316,6 +327,18 @@ def upload_souls(user, file, mission_id: int, location_id: int):
 
 
 
+def user_has_soul_access(user, soul) -> bool:
+    """A soul's recorder, assigned carer, or any co-carer all share access —
+    not just the original recorder (`soul.user`)."""
+    if soul.user_id and soul.user_id == user.pk:
+        return True
+    if soul.assigned_to_id and soul.assigned_to_id == user.pk:
+        return True
+    if soul.pk and soul.co_carers.filter(pk=user.pk).exists():
+        return True
+    return False
+
+
 def progress_update_handler(user, kwargs):
     progress_update_in = kwargs.get("progress_update_in")
     soul_id = progress_update_in.soul_id if progress_update_in else kwargs.get("soul_id")
@@ -326,7 +349,7 @@ def progress_update_handler(user, kwargs):
         soul = get_soul_by_client_id(soul_client_id)
     else:
         return None
-    if not soul.user or soul.user.pk != user.pk:
+    if not user_has_soul_access(user, soul):
         raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None
 
@@ -334,14 +357,14 @@ def progress_update_handler(user, kwargs):
 def missioner_soul_operations_handler(user, kwargs):
     """
     Restriction handler for missioners updating souls.
-    Ensures missioners can only update souls associated to them.
+    Ensures missioners can only update souls they recorded, are assigned
+    to, or are a co-carer for.
     """
-    print("KWARGS", kwargs)
     soul_id = kwargs.get('soul_id')
     if not soul_id:
         raise CustomValidationError("Soul ID is required.")
 
     soul = get_soul(soul_id=soul_id)
 
-    if not soul.user or soul.user.pk != user.id:
+    if not user_has_soul_access(user, soul):
         raise CustomValidationError("You can only view/update souls assigned to you.")

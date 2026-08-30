@@ -12,6 +12,7 @@ from testimonies.selectors import testimony_details, miracle_details, highlight_
 from users.selectors import user_details
 from souls.models import Soul
 from souls.selectors import get_soul
+from souls.services import user_has_soul_access
 from missions.selectors import mission_details
 
 
@@ -286,7 +287,7 @@ def miracle_and_testimony_handler(user, kwargs):
 
     soul = get_soul(soul_id)
 
-    if not soul.user or soul.user.pk != user.pk:
+    if not user_has_soul_access(user, soul):
         raise CustomValidationError("You can only edit miracles/testimonies/highlights for souls assigned to you.")
     return None
 
@@ -354,7 +355,7 @@ def bulk_create_highlight_photos(highlight_id: int, images_data: List[Dict[str, 
 
 
 def _check_soul_owned_by(user, soul) -> None:
-    if not soul or not soul.user or soul.user.pk != user.pk:
+    if not soul or not user_has_soul_access(user, soul):
         raise CustomValidationError("You can only manage photos for souls assigned to you.")
 
 

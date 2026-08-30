@@ -7,6 +7,8 @@
 from enum import Enum
 from typing import Optional, Dict, Any
 
+from django.db.models import Q
+
 from authentication.permissions import has_role_type
 from base.utils.exceptions import CustomValidationError
 from base.utils.helpers import apply_sorting
@@ -46,7 +48,7 @@ def list_souls(
     qs = Soul.objects.filter(deleted_at__isnull=True)
     is_special_user = has_role_type("admin", user=user) or has_role_type("superadmin", user=user) or has_role_type("staff", user=user) or has_role_type("executive", user=user)
     if not is_special_user:
-        qs = qs.filter(user=user)
+        qs = qs.filter(Q(user=user) | Q(assigned_to=user) | Q(co_carers=user)).distinct()
     qs = apply_sorting(
         qs,
         sort_by=sort_by,

@@ -1,7 +1,7 @@
 import datetime
 import uuid
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 
 from ninja import Schema
 
@@ -63,6 +63,9 @@ class SoulCreate(Schema):
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: bool = False
     do_not_contact_at: Optional[datetime.datetime] = None
+    assigned_to: Optional[int] = None
+    co_carers: Optional[List[int]] = None
+    church_connected: Optional[str] = None
 
 
 class SoulUpdate(Schema):
@@ -85,6 +88,9 @@ class SoulUpdate(Schema):
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: Optional[bool] = None
     do_not_contact_at: Optional[datetime.datetime] = None
+    assigned_to: Optional[int] = None
+    co_carers: Optional[List[int]] = None
+    church_connected: Optional[str] = None
 
 class ProgressUpdateSummary(BaseOut):
     """Schema for progress update output."""
@@ -125,6 +131,10 @@ class SoulOut(BaseOut):
     do_not_contact: bool = False
     do_not_contact_at: Optional[str] = None
     possible_duplicate_of: Optional[int] = None
+    assigned_to_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None
+    co_carer_ids: List[int] = []
+    church_connected: Optional[str] = None
 
 
 class SoulMergeIn(Schema):

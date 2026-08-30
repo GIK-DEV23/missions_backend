@@ -339,3 +339,107 @@ class ConsentDuplicateAndMergeTests(TestCase):
         soul = services.create_soul(self._soul_data())
         with self.assertRaises(CustomValidationError):
             services.merge_souls(self.user, soul.id, soul.id)
+
+
+class SharedCareTests(TestCase):
+    def setUp(self):
+        self.recorder = User.objects.create_user(
+            email="recorder@example.com", password="pass1234",
+            username="recorder", first_name="Rec", last_name="Order",
+        )
+        self.assigned = User.objects.create_user(
+            email="assigned@example.com", password="pass1234",
+            username="assigned", first_name="Ass", last_name="Igned",
+        )
+        self.co_carer = User.objects.create_user(
+            email="cocarer@example.com", password="pass1234",
+            username="cocarer", first_name="Co", last_name="Carer",
+        )
+        self.stranger = User.objects.create_user(
+            email="stranger@example.com", password="pass1234",
+            username="stranger", first_name="Str", last_name="Anger",
+        )
+
+    def _soul_data(self, **overrides):
+        data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone_number": "+254700000050",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+            "user": self.recorder.id,
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_soul_with_assigned_to_and_co_carers(self):
+        soul = services.create_soul(self._soul_data(
+            assigned_to=self.assigned.id,
+            co_carers=[self.co_carer.id],
+        ))
+        self.assertEqual(soul.assigned_to_id, self.assigned.id)
+        self.assertEqual(list(soul.co_carers.values_list("id", flat=True)), [self.co_carer.id])
+
+    def test_update_soul_sets_church_connected(self):
+        soul = services.create_soul(self._soul_data())
+        updated = services.update_soul(self.recorder, soul.id, {"church_connected": "Grace Chapel"})
+        self.assertEqual(updated.church_connected, "Grace Chapel")
+
+    def test_update_can_replace_co_carers(self):
+        soul = services.create_soul(self._soul_data(co_carers=[self.co_carer.id]))
+        other_carer = User.objects.create_user(
+            email="other-carer@example.com", password="pass1234",
+            username="othercarer", first_name="Other", last_name="Carer",
+        )
+        updated = services.update_soul(self.recorder, soul.id, {"co_carers": [other_carer.id]})
+        self.assertEqual(list(updated.co_carers.values_list("id", flat=True)), [other_carer.id])
+
+    def test_recorder_has_access(self):
+        soul = services.create_soul(self._soul_data())
+        self.assertTrue(services.user_has_soul_access(self.recorder, soul))
+
+    def test_assigned_to_has_access(self):
+        soul = services.create_soul(self._soul_data(assigned_to=self.assigned.id))
+        self.assertTrue(services.user_has_soul_access(self.assigned, soul))
+
+    def test_co_carer_has_access(self):
+        soul = services.create_soul(self._soul_data(co_carers=[self.co_carer.id]))
+        self.assertTrue(services.user_has_soul_access(self.co_carer, soul))
+
+    def test_stranger_has_no_access(self):
+        soul = services.create_soul(self._soul_data(
+            assigned_to=self.assigned.id, co_carers=[self.co_carer.id]
+        ))
+        self.assertFalse(services.user_has_soul_access(self.stranger, soul))
+
+    def test_co_carer_can_log_progress_update(self):
+        soul = services.create_soul(self._soul_data(co_carers=[self.co_carer.id]))
+        # progress_update_handler raises on denial, returns None on success
+        result = services.progress_update_handler(self.co_carer, {"soul_id": soul.id})
+        self.assertIsNone(result)
+
+    def test_stranger_cannot_log_progress_update(self):
+        soul = services.create_soul(self._soul_data())
+        with self.assertRaises(CustomValidationError):
+            services.progress_update_handler(self.stranger, {"soul_id": soul.id})
+
+    def test_list_souls_includes_assigned_and_co_cared(self):
+        from souls.selectors import list_souls
+
+        assigned_soul = services.create_soul(self._soul_data(
+            phone_number="+254700000051", assigned_to=self.assigned.id
+        ))
+        co_cared_soul = services.create_soul(self._soul_data(
+            phone_number="+254700000052", co_carers=[self.co_carer.id]
+        ))
+        unrelated_soul = services.create_soul(self._soul_data(phone_number="+254700000053"))
+
+        assigned_ids = set(list_souls(self.assigned).values_list("id", flat=True))
+        self.assertIn(assigned_soul.id, assigned_ids)
+        self.assertNotIn(co_cared_soul.id, assigned_ids)
+        self.assertNotIn(unrelated_soul.id, assigned_ids)
+
+        co_carer_ids = set(list_souls(self.co_carer).values_list("id", flat=True))
+        self.assertIn(co_cared_soul.id, co_carer_ids)
