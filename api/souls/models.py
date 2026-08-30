@@ -34,6 +34,9 @@ class Soul(BaseModel):
     do_not_contact_at = models.DateTimeField(null=True, blank=True)
     possible_duplicate_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='possible_duplicates')
     deleted_at = models.DateTimeField(null=True, blank=True, help_text="Tombstone, set when merged into another soul")
+    assigned_to = models.ForeignKey("users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_souls', help_text="Primary volunteer responsible for follow-up")
+    co_carers = models.ManyToManyField("users.User", blank=True, related_name='co_cared_souls', help_text="Other volunteers with shared follow-up access to this soul")
+    church_connected = models.CharField(max_length=200, null=True, blank=True)
 
     class Meta:
         db_table = "souls"
@@ -59,6 +62,9 @@ class Soul(BaseModel):
             "possible_duplicate_of": self.possible_duplicate_of_id,
             "user_id": self.user.id if self.user else None,
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
+            "assigned_to_id": self.assigned_to_id,
+            "assigned_to_name": str(self.assigned_to.get_full_name()) if self.assigned_to else None,
+            "co_carer_ids": list(self.co_carers.values_list('id', flat=True)) if self.pk else [],
             "soul_full_name": self.get_full_name()
         })
         return data
