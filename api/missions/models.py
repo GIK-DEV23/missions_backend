@@ -105,6 +105,7 @@ class Mission(BaseModel):
     registration_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     couple_registration_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     banner_image = models.ImageField(upload_to=get_missions_banner_dir, null=True, blank=True)
+    souls_reached = models.PositiveIntegerField(null=True, blank=True, help_text="Reported crowd figure for everyone talked to, broader than souls won")
 
     def __str__(self):
         return self.title
