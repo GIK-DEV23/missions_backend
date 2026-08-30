@@ -269,3 +269,81 @@ class Highlight(BaseModel):
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
         })
         return data
+
+
+def get_testimony_photo_dir(instance, filename):
+    f_name, ext = os.path.splitext(filename)
+    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return os.path.join("testimonies", "photos", "extra", "{}{}".format(timestamp, ext))
+
+
+def get_miracle_photo_dir(instance, filename):
+    f_name, ext = os.path.splitext(filename)
+    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return os.path.join("miracles", "photos", "extra", "{}{}".format(timestamp, ext))
+
+
+def get_highlight_photo_dir(instance, filename):
+    f_name, ext = os.path.splitext(filename)
+    timestamp = timezone.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return os.path.join("highlights", "photos", "extra", "{}{}".format(timestamp, ext))
+
+
+class TestimonyPhoto(BaseModel):
+    """Additional photos beyond Testimony's single `photo` field."""
+    testimony = models.ForeignKey(Testimony, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=get_testimony_photo_dir)
+    title = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "testimony_photos"
+        ordering = ["-created_at"]
+
+    def to_dict(self, request: HttpRequest = None) -> Dict[str, Any]:
+        data = super().to_dict()
+        data.update({
+            "testimony_id": self.testimony_id,
+            "image_url": request.build_absolute_uri(self.image.url) if self.image and request else None,
+        })
+        return data
+
+
+class MiraclePhoto(BaseModel):
+    """Additional photos beyond Miracle's single `photo` field."""
+    miracle = models.ForeignKey(Miracle, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=get_miracle_photo_dir)
+    title = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "miracle_photos"
+        ordering = ["-created_at"]
+
+    def to_dict(self, request: HttpRequest = None) -> Dict[str, Any]:
+        data = super().to_dict()
+        data.update({
+            "miracle_id": self.miracle_id,
+            "image_url": request.build_absolute_uri(self.image.url) if self.image and request else None,
+        })
+        return data
+
+
+class HighlightPhoto(BaseModel):
+    """Additional photos beyond Highlight's single `photo` field."""
+    highlight = models.ForeignKey(Highlight, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to=get_highlight_photo_dir)
+    title = models.CharField(max_length=200, blank=True)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "highlight_photos"
+        ordering = ["-created_at"]
+
+    def to_dict(self, request: HttpRequest = None) -> Dict[str, Any]:
+        data = super().to_dict()
+        data.update({
+            "highlight_id": self.highlight_id,
+            "image_url": request.build_absolute_uri(self.image.url) if self.image and request else None,
+        })
+        return data

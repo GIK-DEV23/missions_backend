@@ -153,6 +153,7 @@ class User(AbstractUser, BaseModel):
     emergency_contact_phone = PhoneNumberField(null=True, blank=True)
     emergency_contact_confirmed_at = models.DateTimeField(null=True, blank=True)
     saved_partner = models.JSONField(null=True, blank=True, help_text="{name, gender, traveling_from, dietary}")
+    deletion_requested_at = models.DateTimeField(null=True, blank=True, help_text="Kenya DPA deletion request — data purge handled separately, not an immediate wipe")
 
     # Use email as the unique identifier for authentication
     USERNAME_FIELD = 'email'
