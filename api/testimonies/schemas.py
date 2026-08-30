@@ -162,3 +162,32 @@ class HighlightOutSchema(BaseOut):
     review_status: str
     rejection_reason: Optional[str] = None
     third_party_consent: bool = False
+
+
+class PhotoUploadSchema(Schema):
+    """Bulk multi-photo upload — `images` files handled separately via request.FILES."""
+    images_data: str = Field(
+        ...,
+        description="JSON-encoded array of {title?, description?}, one entry per uploaded file, same order"
+    )
+
+
+class TestimonyPhotoOutSchema(BaseOut):
+    testimony_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None
+
+
+class MiraclePhotoOutSchema(BaseOut):
+    miracle_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None
+
+
+class HighlightPhotoOutSchema(BaseOut):
+    highlight_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None

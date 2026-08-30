@@ -1,13 +1,13 @@
 """
 Services for testimonies and miracles - create/update/delete business logic
 """
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from django.core.exceptions import ValidationError
 
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.helpers import resolve_fk_by_client_id
 from testimonies.constants import ReviewStatus
-from testimonies.models import Testimony, Miracle, Highlight
+from testimonies.models import Testimony, Miracle, Highlight, TestimonyPhoto, MiraclePhoto, HighlightPhoto
 from testimonies.selectors import testimony_details, miracle_details, highlight_details
 from users.selectors import user_details
 from souls.models import Soul
@@ -288,4 +288,98 @@ def miracle_and_testimony_handler(user, kwargs):
 
     if not soul.user or soul.user.pk != user.pk:
         raise CustomValidationError("You can only edit miracles/testimonies/highlights for souls assigned to you.")
+    return None
+
+def bulk_create_testimony_photos(testimony_id: int, images_data: List[Dict[str, Any]]) -> List[TestimonyPhoto]:
+    testimony = testimony_details(testimony_id)
+    photos = []
+    try:
+        for data in images_data:
+            photo = TestimonyPhoto(
+                testimony=testimony,
+                image=data['image'],
+                title=data.get('title', ''),
+                description=data.get('description', ''),
+            )
+            photo.full_clean()
+            photos.append(photo)
+        TestimonyPhoto.objects.bulk_create(photos)
+        return photos
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
+def bulk_create_miracle_photos(miracle_id: int, images_data: List[Dict[str, Any]]) -> List[MiraclePhoto]:
+    miracle = miracle_details(miracle_id)
+    photos = []
+    try:
+        for data in images_data:
+            photo = MiraclePhoto(
+                miracle=miracle,
+                image=data['image'],
+                title=data.get('title', ''),
+                description=data.get('description', ''),
+            )
+            photo.full_clean()
+            photos.append(photo)
+        MiraclePhoto.objects.bulk_create(photos)
+        return photos
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
+def bulk_create_highlight_photos(highlight_id: int, images_data: List[Dict[str, Any]]) -> List[HighlightPhoto]:
+    highlight = highlight_details(highlight_id)
+    photos = []
+    try:
+        for data in images_data:
+            photo = HighlightPhoto(
+                highlight=highlight,
+                image=data['image'],
+                title=data.get('title', ''),
+                description=data.get('description', ''),
+            )
+            photo.full_clean()
+            photos.append(photo)
+        HighlightPhoto.objects.bulk_create(photos)
+        return photos
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
+def _check_soul_owned_by(user, soul) -> None:
+    if not soul or not soul.user or soul.user.pk != user.pk:
+        raise CustomValidationError("You can only manage photos for souls assigned to you.")
+
+
+def testimony_photo_restriction_handler(user, kwargs):
+    testimony_id = kwargs.get('testimony_id')
+    if not testimony_id:
+        return None
+    testimony = testimony_details(testimony_id)
+    _check_soul_owned_by(user, testimony.soul)
+    return None
+
+
+def miracle_photo_restriction_handler(user, kwargs):
+    miracle_id = kwargs.get('miracle_id')
+    if not miracle_id:
+        return None
+    miracle = miracle_details(miracle_id)
+    _check_soul_owned_by(user, miracle.soul)
+    return None
+
+
+def highlight_photo_restriction_handler(user, kwargs):
+    highlight_id = kwargs.get('highlight_id')
+    if not highlight_id:
+        return None
+    highlight = highlight_details(highlight_id)
+    _check_soul_owned_by(user, highlight.soul)
     return None

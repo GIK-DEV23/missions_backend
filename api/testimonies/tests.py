@@ -5,7 +5,7 @@ from django.test import TestCase
 from base.utils.exceptions import CustomValidationError
 from souls import services as soul_services
 from souls.constants import JourneyStage
-from testimonies import services
+from testimonies import services, selectors
 from testimonies.constants import ReviewStatus, SubmissionVisibility
 from users.constants import GenderType, AgeGroupCategory
 
@@ -152,3 +152,41 @@ class HighlightTests(TestCase):
         services.delete_highlight(highlight_id)
         with self.assertRaises(CustomValidationError):
             highlight_details(highlight_id)
+
+
+class MultiPhotoTests(TestCase):
+    def _fake_image(self, name="photo.jpg"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile(name, b"fake image bytes", content_type="image/jpeg")
+
+    def test_bulk_create_testimony_photos(self):
+        testimony = services.create_testimony({"title": "T", "content": "C"})
+        photos = services.bulk_create_testimony_photos(testimony.id, [
+            {"image": self._fake_image("a.jpg"), "title": "First", "description": "d1"},
+            {"image": self._fake_image("b.jpg"), "title": "Second", "description": "d2"},
+        ])
+        self.assertEqual(len(photos), 2)
+        self.assertEqual(photos[0].testimony_id, testimony.id)
+        self.assertEqual(selectors.testimony_photos_list(testimony.id).count(), 2)
+
+    def test_bulk_create_miracle_photos(self):
+        miracle = services.create_miracle({"title": "M", "content": "C"})
+        photos = services.bulk_create_miracle_photos(miracle.id, [
+            {"image": self._fake_image("a.jpg"), "title": "First", "description": ""},
+        ])
+        self.assertEqual(len(photos), 1)
+        self.assertEqual(selectors.miracle_photos_list(miracle.id).count(), 1)
+
+    def test_bulk_create_highlight_photos(self):
+        highlight = services.create_highlight({"title": "H", "content": "C"})
+        photos = services.bulk_create_highlight_photos(highlight.id, [
+            {"image": self._fake_image("a.jpg"), "title": "First", "description": ""},
+        ])
+        self.assertEqual(len(photos), 1)
+        self.assertEqual(selectors.highlight_photos_list(highlight.id).count(), 1)
+
+    def test_photos_for_unknown_testimony_rejected(self):
+        with self.assertRaises(CustomValidationError):
+            services.bulk_create_testimony_photos(999999, [
+                {"image": self._fake_image(), "title": "", "description": ""},
+            ])

@@ -6,7 +6,7 @@ from django.db.models import Q
 
 from base.utils.exceptions import CustomValidationError
 from testimonies.filters import TestimonyFilter, MiracleFilter, HighlightFilter
-from testimonies.models import Testimony, Miracle, Highlight
+from testimonies.models import Testimony, Miracle, Highlight, TestimonyPhoto, MiraclePhoto, HighlightPhoto
 
 
 def testimonies_list(filters: Optional[dict] = None):
@@ -52,3 +52,15 @@ def highlight_details(highlight_id: int) -> Highlight:
         return Highlight.objects.get(id=highlight_id)
     except Highlight.DoesNotExist:
         raise CustomValidationError("Highlight with ID {} does not exist".format(highlight_id))
+
+
+def testimony_photos_list(testimony_id: int):
+    return TestimonyPhoto.objects.filter(testimony_id=testimony_id)
+
+
+def miracle_photos_list(miracle_id: int):
+    return MiraclePhoto.objects.filter(miracle_id=miracle_id)
+
+
+def highlight_photos_list(highlight_id: int):
+    return HighlightPhoto.objects.filter(highlight_id=highlight_id)
