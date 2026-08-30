@@ -33,6 +33,20 @@ class PaymentTimingChoices(str, Enum):
     ON_ARRIVAL = "on_arrival"
 
 
+class PaymentStatusChoices(str, Enum):
+    UNPAID = "unpaid"
+    PENDING = "pending"
+    PAID = "paid"
+    SPONSORED = "sponsored"
+
+
+class RegistrationStatusChoices(str, Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    WAITLIST = "waitlist"
+    CANCELLED = "cancelled"
+
+
 class LocationsFilterSchema(BaseQuery):
     parent_location_id: int | None = None
     category: str | None = None
@@ -229,6 +243,8 @@ class MissionParticipantCreateSchema(Schema):
     coming_as_couple: bool | None = False
     partner_name: str | None = ""
     payment_timing: PaymentTimingChoices | None = None
+    consent_code_of_conduct: bool | None = False
+    consent_photo: bool | None = False
 
 
 class MissionParticipantUpdateSchema(Schema):
@@ -242,6 +258,10 @@ class MissionParticipantUpdateSchema(Schema):
     need_facilitation: bool | None
     facilitation_amount: Decimal | None = None
     payment_timing: PaymentTimingChoices | None = None
+    payment_status: PaymentStatusChoices | None = None
+    consent_code_of_conduct: bool | None = None
+    consent_photo: bool | None = None
+    status: RegistrationStatusChoices | None = None
 
 
 class BulkUpdateMissionJIASchema(Schema):
@@ -265,6 +285,10 @@ class MissionParticipantOutSchema(BaseOut):
     partner_name: str | None = None
     gender: str
     payment_timing: str | None = None
+    payment_status: str
+    consent_code_of_conduct: bool = False
+    consent_photo: bool = False
+    status: str
 
 
 class ReportCreateSchema(Schema):

@@ -191,6 +191,13 @@ def mission_participants_list(
     return MissionJIAFilter(filters, qs).qs if filters else qs
 
 
+def my_registrations(user) -> models.QuerySet:
+    """MissionParticipant rows for the authenticated user (GET /api/registrations/mine/)."""
+    return MissionJIAParticipant.objects.filter(
+        user=user, is_archived=False
+    ).select_related('mission', 'user').order_by('-created_at')
+
+
 def report_details(report_id: int) -> Report:
     """
     Get details of a report by ID.

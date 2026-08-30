@@ -16,6 +16,18 @@ from authentication.decorators import require_permission
 router = Router(
     tags=["missions"],
 )
+registrations_router = Router(tags=["registrations"])
+
+
+@registrations_router.get(
+    "/mine/",
+    response={200: List[schemas.MissionParticipantOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+def my_registrations_api(request):
+    """The authenticated user's own MissionParticipant rows, across all missions."""
+    registrations = selectors.my_registrations(user=request.user)
+    return 200, [schemas.MissionParticipantOutSchema(**r.to_dict(request)) for r in registrations]
 
 
 @router.get(
