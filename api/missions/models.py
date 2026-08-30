@@ -9,7 +9,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel, client_id_field
 from base.utils.exceptions import CustomValidationError
-from missions.constants import LocationCategoryType, MissionStatusType, EventType
+from missions.constants import LocationCategoryType, MissionStatusType, EventType, PaymentTiming
 from missions.schemas import AttendanceDayOut
 from users.constants import GenderType
 
@@ -161,6 +161,7 @@ class MissionJIAParticipant(BaseModel):
     partner_name = models.CharField(max_length=100, blank=True, help_text="Partner's full name if coming as a couple")
     phone_number = PhoneNumberField()
     gender = models.CharField(choices=GenderType.choices, max_length=20)
+    payment_timing = models.CharField(max_length=20, choices=PaymentTiming.choices, null=True, blank=True)
 
     def __str__(self):
         return f"{self.phone_number} - {self.full_name}"
