@@ -212,6 +212,8 @@ class MinimalMissionOutSchema(BaseOut):
     is_registration_open: bool | None = None
     total_souls_won: str | None = None
     souls_reached: int | None = None
+    created_by_id: int | None = None
+    created_by_name: str | None = None
 
 
 class MissionOutSchema(MinimalMissionOutSchema):

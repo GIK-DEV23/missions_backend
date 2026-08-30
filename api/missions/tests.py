@@ -233,3 +233,23 @@ class ClientIdTests(TestCase):
 
     def test_mission_souls_reached_defaults_to_none(self):
         self.assertIsNone(self.mission.souls_reached)
+
+    def test_created_by_is_set_and_exposed_in_schema(self):
+        from missions import schemas
+
+        mission = services.create_mission(
+            title="Authorship Test",
+            description="Desc",
+            category_id=self.category.id,
+            location_id=self.location.id,
+            start_date=datetime.date(2026, 7, 1),
+            end_date=datetime.date(2026, 7, 1),
+            user=self.user,
+        )
+        self.assertEqual(mission.created_by_id, self.user.id)
+
+        # This is the actual regression: to_dict() already had these keys,
+        # but the pydantic output schema silently dropped them.
+        out = schemas.MissionOutSchema(**mission.to_dict())
+        self.assertEqual(out.created_by_id, self.user.id)
+        self.assertIn(self.user.email, out.created_by_name)
