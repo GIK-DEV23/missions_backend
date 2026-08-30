@@ -15,12 +15,21 @@ from souls.models import Soul, ProgressUpdate
 
 
 def get_soul(soul_id: int):
-    """Retrieve a soul by its ID."""
+    """Retrieve a soul by its ID. Excludes souls merged away via /merge/."""
 
     try:
-        return Soul.objects.get(id=soul_id)
+        return Soul.objects.get(id=soul_id, deleted_at__isnull=True)
     except Soul.DoesNotExist:
         raise CustomValidationError("Soul with ID {} does not exist".format(soul_id))
+
+
+def get_soul_by_client_id(client_id):
+    """Retrieve a soul by its client_id. Excludes souls merged away via /merge/."""
+
+    try:
+        return Soul.objects.get(client_id=client_id, deleted_at__isnull=True)
+    except Soul.DoesNotExist:
+        raise CustomValidationError("Soul with client_id {} does not exist".format(client_id))
 
 
 def list_souls(
@@ -34,7 +43,7 @@ def list_souls(
         sort_by = 'uploaded_at'
     if isinstance(sort_by, Enum):
         sort_by = sort_by.value
-    qs = Soul.objects.all()
+    qs = Soul.objects.filter(deleted_at__isnull=True)
     is_special_user = has_role_type("admin", user=user) or has_role_type("superadmin", user=user) or has_role_type("staff", user=user) or has_role_type("executive", user=user)
     if not is_special_user:
         qs = qs.filter(user=user)
@@ -54,7 +63,7 @@ def souls_stats(user, filters: Optional[Dict[str, Any]] = None):
     from django.db.models.functions import TruncMonth
     from django.db.models import Count
 
-    qs = Soul.objects.all()
+    qs = Soul.objects.filter(deleted_at__isnull=True)
     if filters:
         qs = SoulFilter(filters, queryset=qs).qs
     total_souls = qs.count()

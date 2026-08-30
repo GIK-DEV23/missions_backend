@@ -16,10 +16,13 @@ def parse_integrity_error(error: IntegrityError) -> str:
 
     # Check for unique constraint violation
     if "duplicate key value violates unique constraint" in message:
-        match = re.search(r"Key \((\w+)\)=\((.*?)\) already exists", message)
+        match = re.search(r"Key \(([\w, ]+)\)=\((.*?)\) already exists", message)
         if match:
-            field, value = match.groups()
-            return "The value '{}' is already used for '{}'. Please use a different one.".format(value, field)
+            fields, value = match.groups()
+            field_names = [f.strip() for f in fields.split(",")]
+            if len(field_names) == 1:
+                return "The value '{}' is already used for '{}'. Please use a different one.".format(value, field_names[0])
+            return "A record with this combination of {} already exists.".format(", ".join(field_names))
         else:
             return "A unique constraint was violated. Please check your input values."
 
