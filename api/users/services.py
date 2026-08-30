@@ -1,6 +1,7 @@
 from typing import Optional, List
 
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from authentication.permissions import has_role_type
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
@@ -224,3 +225,40 @@ def missioner_restriction_handler(user, kwargs):
     # Missioners can only access their own data
     if requested_user_id and requested_user_id != user.id:
         raise CustomValidationError("You can only access your own details.")
+
+
+def export_user_data(user: User) -> dict:
+    """Kenya DPA: a full export of everything this user owns/created across the system.
+
+    Local imports to avoid module-level cross-app cycles — this codebase's
+    import graph is fragile (see authentication/__init__.py history).
+    """
+    from souls.models import Soul, ProgressUpdate
+    from testimonies.models import Testimony, Miracle, Highlight
+    from missions.models import MissionJIAParticipant
+    from personal_missions.models import PersonalMission
+    from notifications.models import Notification
+
+    return {
+        "profile": user.to_dict(),
+        "souls": [s.to_dict() for s in Soul.objects.filter(user=user)],
+        "progress_updates": [p.to_dict() for p in ProgressUpdate.objects.filter(author=user)],
+        "testimonies": [t.to_dict() for t in Testimony.objects.filter(user=user)],
+        "miracles": [m.to_dict() for m in Miracle.objects.filter(user=user)],
+        "highlights": [h.to_dict() for h in Highlight.objects.filter(user=user)],
+        "personal_missions": [pm.to_dict() for pm in PersonalMission.objects.filter(owner=user)],
+        "registrations": [r.to_dict() for r in MissionJIAParticipant.objects.filter(user=user)],
+        "notifications": [n.to_dict() for n in Notification.objects.filter(user=user)],
+    }
+
+
+def request_account_deletion(user: User) -> User:
+    """Kenya DPA: marks the account for deletion — a request, not an immediate wipe.
+    The actual data purge is a separate, later process (legal/grace-period
+    handling), not built here. Deactivates the account immediately so it
+    can't keep being used while the request is pending.
+    """
+    user.deletion_requested_at = timezone.now()
+    user.is_active = False
+    user.save(update_fields=["deletion_requested_at", "is_active", "updated_at"])
+    return user

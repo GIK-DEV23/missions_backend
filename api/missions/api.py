@@ -16,6 +16,18 @@ from authentication.decorators import require_permission
 router = Router(
     tags=["missions"],
 )
+registrations_router = Router(tags=["registrations"])
+
+
+@registrations_router.get(
+    "/mine/",
+    response={200: List[schemas.MissionParticipantOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+def my_registrations_api(request):
+    """The authenticated user's own MissionParticipant rows, across all missions."""
+    registrations = selectors.my_registrations(user=request.user)
+    return 200, [schemas.MissionParticipantOutSchema(**r.to_dict(request)) for r in registrations]
 
 
 @router.get(
@@ -447,7 +459,7 @@ def mission_gallery_images_list_api(
 
 @router.post(
     "/gallery/images/create/",
-    response={201: schemas.MissionGalleryOutSchema, 400: DetailOut},
+    response={201: List[schemas.MissionGalleryOutSchema], 400: DetailOut},
     auth=jwt_auth
 )
 @require_permission("create_photo_gallery")
@@ -506,12 +518,17 @@ def create_mission_gallery_image_api(request, image_in: schemas.MissionGalleryCr
             "The number of uploaded files must match the number of metadata items."
         )
 
-    # Combine files with metadata
-    image_in_dict = image_in.dict()
-    image_in_dict["image_files"] = image_files
-    image_in_dict["images_metadata"] = images_metadata
+    # Combine files with metadata into the shape bulk_create_gallery_images expects
+    images_data = [
+        {"image": file, "title": meta.get("title", ""), "description": meta.get("description", "")}
+        for file, meta in zip(image_files, images_metadata)
+    ]
 
-    images = services.bulk_create_gallery_images(**image_in_dict)
+    images = services.bulk_create_gallery_images(
+        mission_id=image_in.mission_id,
+        uploaded_by_id=image_in.uploaded_by_id,
+        images_data=images_data,
+    )
     return 201, [schemas.MissionGalleryOutSchema(**img.to_dict(request)) for img in images]
 
 
