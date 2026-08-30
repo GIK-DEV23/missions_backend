@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "base",
     "users",
+    "authentication",
     "missions",
     "personal_missions",
     "souls",
@@ -103,6 +104,22 @@ CACHES = {
         }
     }
 }
+
+# Falls back to printing emails to the console when EMAIL_HOST isn't set,
+# so local dev works without any SMTP config.
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend" if not config("EMAIL_HOST", default="") else "django.core.mail.backends.smtp.EmailBackend"
+)
+EMAIL_HOST = config("EMAIL_HOST", default="")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@gik-missions.org")
+
+# The mobile app opens the reset screen via deep link, not a web page.
+PASSWORD_RESET_DEEP_LINK_BASE = config("PASSWORD_RESET_DEEP_LINK_BASE", default="gikmissions://reset-password")
 
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS=True
