@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
@@ -7,7 +8,7 @@ from django.utils import timezone
 
 from audit_logs.schemas import ActionType
 from audit_logs.services import log_audit_event
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, parse_integrity_error
 from base.utils.helpers import serialize_types
 from missions.constants import EventType
 from missions.models import MissionCategory, Mission, MissionJIAParticipant, Report, MissionGallery, Location
@@ -228,7 +229,8 @@ def create_mission(
     registration_fee_required: Optional[bool] = True,
     registration_fee: Optional[Decimal] = None,
     couple_registration_fee: Optional[Decimal] = None,
-    banner_image=None
+    banner_image=None,
+    client_id: Optional[uuid.UUID] = None
 ) -> Mission:
     """
     Create a new mission.
@@ -273,7 +275,8 @@ def create_mission(
         registration_fee=registration_fee,
         couple_registration_fee=couple_registration_fee,
         banner_image=banner_image,
-        created_by=user
+        created_by=user,
+        client_id=client_id
     )
     return mission
 
@@ -384,7 +387,8 @@ def create_mission_participant(
     facilitation_amount: Decimal | None = None,
     user_id: int | None = None,
     coming_as_couple: bool | None = False,
-    partner_name: str | None = ""
+    partner_name: str | None = "",
+    client_id: uuid.UUID | None = None
 ):
     if not full_name and not user_id:
         raise CustomValidationError("Either full name or user id must be provided.")
@@ -462,12 +466,11 @@ def create_mission_participant(
             facilitation_amount=facilitation_amount,
             gender=gender,
             coming_as_couple=coming_as_couple,
-            partner_name=partner_name
+            partner_name=partner_name,
+            client_id=client_id
         )
     except IntegrityError as e:
-        if 'unique constraint' in str(e).lower():
-            raise CustomValidationError("A participant with the same full name and phone number already exists for this mission.")
-        raise CustomValidationError(str(e))
+        raise CustomValidationError(parse_integrity_error(e))
     except Exception as e:
         raise CustomValidationError(str(e))
 

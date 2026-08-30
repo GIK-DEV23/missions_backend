@@ -34,6 +34,7 @@ ALL_PERMISSIONS = {
     "view_soul",
     "update_soul",
     "delete_soul",
+    "merge_soul",
     "upload_souls",
     "create_miracle",
     "list_miracles",
@@ -67,6 +68,12 @@ ALL_PERMISSIONS = {
     "update_jia_participant",
     "delete_jia_participant",
     "view_exec_dashboard",
+    "sync_mutations",
+    "sync_changes",
+    "list_personal_missions",
+    "create_personal_mission",
+    "update_personal_mission",
+    "archive_personal_mission",
 }
 
 # Permission templates for different roles
@@ -105,6 +112,12 @@ MISSIONER_PERMISSIONS = {
     "delete_progress_update",
     "update_testimony",
     "update_testimony",
+    "sync_mutations",
+    "sync_changes",
+    "list_personal_missions",
+    "create_personal_mission",
+    "update_personal_mission",
+    "archive_personal_mission",
 }
 
 STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
@@ -146,6 +159,7 @@ ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
     "delete_role",
     "view_auditlog",
     "delete_soul",
+    "merge_soul",
     "delete_mission",
     "delete_mission_category",
     "delete_location",
@@ -189,6 +203,7 @@ EXEC_PERMISSIONS = {
     "view_exec_dashboard",
     "view_jia_participant",
     "list_jia_participants",
+    "sync_changes",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS

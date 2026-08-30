@@ -119,6 +119,18 @@ def delete_soul_api(request, soul_id: int):
     return schemas.SoulOut(**soul.to_dict(request))
 
 
+@require_permission("merge_soul")
+@router.post(
+    "/{soul_id}/merge/",
+    response={200: schemas.SoulOut, 400: DetailOut},
+    auth=jwt_auth
+)
+def merge_soul_api(request, soul_id: int, merge_in: schemas.SoulMergeIn):
+    """Merge a duplicate soul into another, reassigning its history."""
+    survivor = services.merge_souls(user=request.user, soul_id=soul_id, into_id=merge_in.into_id)
+    return schemas.SoulOut(**survivor.to_dict(request))
+
+
 @require_permission("list_progress_updates")
 @router.get(
     "progress_updates/",
