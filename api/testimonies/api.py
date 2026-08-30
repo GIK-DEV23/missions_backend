@@ -125,6 +125,28 @@ def delete_miracle_api(request, miracle_id: int):
     return 204, "Miracle deleted successfully"
 
 
+@router.post(
+    "/miracles/{miracle_id}/approve/",
+    response={200: schemas.MiracleOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("approve_miracle")
+def approve_miracle_api(request, miracle_id: int):
+    miracle = services.approve_miracle(miracle_id=miracle_id)
+    return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
+
+
+@router.post(
+    "/miracles/{miracle_id}/reject/",
+    response={200: schemas.MiracleOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("reject_miracle")
+def reject_miracle_api(request, miracle_id: int, reject_in: schemas.RejectSchema):
+    miracle = services.reject_miracle(miracle_id=miracle_id, reason=reject_in.reason)
+    return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
+
+
 @router.get(
     "/{testimony_id}/",
     response={200: schemas.TestimonyOutSchema, 400: DetailOut},
@@ -164,3 +186,25 @@ def update_testimony_api(request, testimony_id: int, testimony_in: schemas.Testi
 def delete_testimony_api(request, testimony_id: int):
     services.delete_testimony(testimony_id=testimony_id)
     return 204, "Testimony deleted successfully"
+
+
+@router.post(
+    "/{testimony_id}/approve/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("approve_testimony")
+def approve_testimony_api(request, testimony_id: int):
+    testimony = services.approve_testimony(testimony_id=testimony_id)
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/{testimony_id}/reject/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("reject_testimony")
+def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSchema):
+    testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason)
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))

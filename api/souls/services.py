@@ -6,6 +6,8 @@
 5. Update progress update
 6. Delete progress update
 """
+from typing import Optional
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -14,29 +16,46 @@ from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.file_parser import FileParser
-from base.utils.helpers import validate_date
+from base.utils.helpers import validate_date, resolve_fk_by_client_id
 from missions.selectors import location_details, mission_details
+from personal_missions.selectors import personal_mission_details
 from souls.models import Soul, ProgressUpdate
-from souls.selectors import get_soul
+from souls.selectors import get_soul, get_soul_by_client_id
 from users.constants import GenderType, AgeGroupCategory
 from users.models import User
 from users.selectors import user_details
 
+FK_RESOLVERS = {
+    "location": location_details,
+    "mission": mission_details,
+    "personal_mission": personal_mission_details,
+    "user": user_details,
+}
+
+
+def _find_possible_duplicate(phone_number, exclude_id=None) -> Optional[int]:
+    qs = Soul.objects.filter(phone_number=phone_number, deleted_at__isnull=True)
+    if exclude_id is not None:
+        qs = qs.exclude(id=exclude_id)
+    match = qs.order_by("created_at").first()
+    return match.id if match else None
+
+
+def _stamp_consent_and_contact_fields(data: dict, existing_consent_recorded_at=None, existing_do_not_contact_at=None):
+    if data.get("consent_given") and not data.get("consent_recorded_at") and not existing_consent_recorded_at:
+        data["consent_recorded_at"] = timezone.now()
+    if data.get("do_not_contact") and not data.get("do_not_contact_at") and not existing_do_not_contact_at:
+        data["do_not_contact_at"] = timezone.now()
+
 
 def create_soul(data) -> Soul:
     try:
-        location_id = data.get("location")
-        user_id = data.get("user")
-        mission_id = data.get("mission")
-        if location_id is not None:
-            location = location_details(location_id)
-            data["location"] = location
-        if user_id is not None:
-            user = user_details(user_id)
-            data["user"] = user
-        if mission_id is not None:
-            mission = mission_details(mission_id)
-            data["mission"] = mission
+        for key, resolver in FK_RESOLVERS.items():
+            if data.get(key) is not None:
+                data[key] = resolver(data[key])
+        _stamp_consent_and_contact_fields(data)
+        if data.get("phone_number"):
+            data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"])
         soul = Soul(**data)
         soul.full_clean()
         soul.save()
@@ -51,15 +70,17 @@ def create_soul(data) -> Soul:
 def update_soul(user, soul_id, data) -> Soul:
     try:
         soul = get_soul(soul_id)
+        new_contact_outcome = data.get("contact_outcome")
+        if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
+            raise CustomValidationError("contact_outcome is immutable once set")
+        _stamp_consent_and_contact_fields(data, soul.consent_recorded_at, soul.do_not_contact_at)
+        if data.get("phone_number"):
+            data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"], exclude_id=soul.id)
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:
-                if key == "location":
-                    location = location_details(value)
-                    setattr(soul, key, location)
-                if key == "mission":
-                    mission = mission_details(value)
-                    setattr(soul, key, mission)
+                if key in FK_RESOLVERS:
+                    value = FK_RESOLVERS[key](value)
                 setattr(soul, key, value)
         soul.full_clean()
         changed_fields = {field: (original_fields[field], getattr(soul, field)) for field in data.keys() if original_fields[field] != getattr(soul, field)}
@@ -82,6 +103,36 @@ def update_soul(user, soul_id, data) -> Soul:
     return soul
 
 
+def merge_souls(user, soul_id: int, into_id: int) -> Soul:
+    if soul_id == into_id:
+        raise CustomValidationError("Cannot merge a soul into itself")
+    duplicate = get_soul(soul_id)
+    survivor = get_soul(into_id)
+    try:
+        with transaction.atomic():
+            ProgressUpdate.objects.filter(soul=duplicate).update(soul=survivor)
+            duplicate.testimonies.update(soul=survivor)
+            duplicate.miracles.update(soul=survivor)
+            duplicate.deleted_at = timezone.now()
+            duplicate.save(update_fields=["deleted_at"])
+            # Any soul (including the survivor) flagged as a duplicate of the
+            # now-merged-away record should point at the survivor instead.
+            Soul.objects.filter(possible_duplicate_of_id=duplicate.id).update(possible_duplicate_of=survivor)
+            # A soul can't be its own possible duplicate — clear that edge case.
+            Soul.objects.filter(id=survivor.id, possible_duplicate_of_id=survivor.id).update(possible_duplicate_of=None)
+            survivor.refresh_from_db(fields=["possible_duplicate_of"])
+        log_audit_event(
+            user=user,
+            action_type=ActionType.MODIFICATION,
+            action_category="souls",
+            action_description=f"Soul ID {soul_id} merged into Soul ID {into_id}.",
+            is_successful=True
+        )
+    except Exception as e:
+        raise CustomValidationError("Error merging souls: {}".format(e))
+    return survivor
+
+
 def delete_soul(user, soul_id) -> Soul:
     soul = get_soul(soul_id)
     try:
@@ -99,12 +150,25 @@ def delete_soul(user, soul_id) -> Soul:
 
 
 def create_progress_update(data: dict) -> ProgressUpdate:
-    soul_id = data.pop("soul_id")
+    data = resolve_fk_by_client_id(data, "soul", Soul)
+    soul_id = data.pop("soul_id", None)
+    if not soul_id:
+        raise CustomValidationError("Either soul_id or soul_client_id is required")
     soul = get_soul(soul_id)
+    author_id = data.pop("author_id", None)
+    if author_id is not None:
+        data["author"] = user_details(author_id)
+    next_check_in_at = data.get("next_check_in_at")
     try:
         progress_update = ProgressUpdate(soul=soul, **data)
         progress_update.full_clean()
         progress_update.save()
+        soul_update_fields = ["last_contacted_at"]
+        soul.last_contacted_at = progress_update.created_at
+        if next_check_in_at:
+            soul.next_check_in_at = next_check_in_at
+            soul_update_fields.append("next_check_in_at")
+        soul.save(update_fields=soul_update_fields)
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -115,12 +179,20 @@ def create_progress_update(data: dict) -> ProgressUpdate:
 
 def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdate:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        author_id = data.pop("author_id", None)
+        if author_id is not None:
+            data["author"] = user_details(author_id)
+        next_check_in_at = data.get("next_check_in_at")
         for key, value in data.items():
             if value is not None:
                 setattr(progress_update, key, value)
         progress_update.full_clean()
         progress_update.save()
+        if next_check_in_at:
+            progress_update.soul.next_check_in_at = next_check_in_at
+            progress_update.soul.save(update_fields=["next_check_in_at"])
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")
     except ValidationError as e:
@@ -134,7 +206,11 @@ def update_progress_update(progress_update_id: int, data: dict) -> ProgressUpdat
 def delete_progress_update(progress_update_id: int) -> ProgressUpdate:
     try:
         progress_update = ProgressUpdate.objects.get(id=progress_update_id)
+        soul = progress_update.soul
         progress_update.delete()
+        latest = soul.progress_updates.order_by("-created_at").first()
+        soul.last_contacted_at = latest.created_at if latest else None
+        soul.save(update_fields=["last_contacted_at"])
         return progress_update
     except ProgressUpdate.DoesNotExist:
         raise CustomValidationError(f"Progress update with ID {progress_update_id} does not exist")
@@ -241,12 +317,15 @@ def upload_souls(user, file, mission_id: int, location_id: int):
 
 
 def progress_update_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
-    soul_id = kwargs.get("progress_update_in").soul_id if "progress_update_in" in kwargs else kwargs.get("soul_id")
-    if not soul_id:
+    progress_update_in = kwargs.get("progress_update_in")
+    soul_id = progress_update_in.soul_id if progress_update_in else kwargs.get("soul_id")
+    soul_client_id = progress_update_in.soul_client_id if progress_update_in else None
+    if soul_id:
+        soul = get_soul(soul_id)
+    elif soul_client_id:
+        soul = get_soul_by_client_id(soul_client_id)
+    else:
         return None
-    soul = get_soul(soul_id)
     if not soul.user or soul.user.pk != user.pk:
         raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None

@@ -14,7 +14,7 @@ class TestimonyFilter(BaseFilterSet):
 
     class Meta:
         model = Testimony
-        fields = ["soul_id", "user_id", "mission_id", "created_before", "created_after", "is_selected"]
+        fields = ["soul_id", "user_id", "mission_id", "created_before", "created_after", "is_selected", "review_status"]
 
 
 class MiracleFilter(BaseFilterSet):
@@ -27,4 +27,4 @@ class MiracleFilter(BaseFilterSet):
 
     class Meta:
         model = Miracle
-        fields = ["soul_id", "user_id", "mission_id", "created_before", "created_after", "is_selected"]
+        fields = ["soul_id", "user_id", "mission_id", "created_before", "created_after", "is_selected", "review_status"]
