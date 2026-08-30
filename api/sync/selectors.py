@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from authentication.permissions import has_role_type
 from souls.models import Soul, ProgressUpdate
-from testimonies.models import Testimony, Miracle
+from testimonies.models import Testimony, Miracle, Highlight
 
 
 def _is_special_user(user) -> bool:
@@ -42,6 +42,13 @@ def visible_miracles(user):
     return qs.filter(user=user)
 
 
+def visible_highlights(user):
+    qs = Highlight.objects.select_related("soul", "user", "mission")
+    if _is_special_user(user):
+        return qs.filter(Q(is_personal=False) | Q(user=user))
+    return qs.filter(user=user)
+
+
 def visible_progress_updates(user):
     """Check-ins follow their soul's visibility, not an owner field of their own."""
     souls = visible_souls(user).values_list("id", flat=True)
@@ -54,12 +61,14 @@ def changes_since(user, since: Optional[datetime.datetime], request=None) -> dic
     souls = visible_souls(user)
     testimonies = visible_testimonies(user)
     miracles = visible_miracles(user)
+    highlights = visible_highlights(user)
     progress_updates = visible_progress_updates(user)
 
     if since:
         souls = souls.filter(updated_at__gte=since)
         testimonies = testimonies.filter(updated_at__gte=since)
         miracles = miracles.filter(updated_at__gte=since)
+        highlights = highlights.filter(updated_at__gte=since)
         progress_updates = progress_updates.filter(updated_at__gte=since)
 
     deleted_soul_ids = []
@@ -75,6 +84,7 @@ def changes_since(user, since: Optional[datetime.datetime], request=None) -> dic
         "progress_updates": [p.to_dict(request) for p in progress_updates],
         "testimonies": [t.to_dict(request) for t in testimonies],
         "miracles": [m.to_dict(request) for m in miracles],
+        "highlights": [h.to_dict(request) for h in highlights],
         "deleted": {"souls": deleted_soul_ids},
         "cursor": cursor.isoformat(),
     }
