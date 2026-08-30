@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 
 from base.models import BaseModel, client_id_field
+from testimonies.constants import SubmissionVisibility, ReviewStatus
 
 
 def get_testimonies_dir(instance, filename):
@@ -84,6 +85,10 @@ class Testimony(BaseModel):
         default=False,
         help_text="Indicates whether the testimony has been selected for publication",
     )
+    visibility = models.CharField(max_length=20, choices=SubmissionVisibility.choices, default=SubmissionVisibility.PUBLIC)
+    review_status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
+    rejection_reason = models.TextField(null=True, blank=True)
+    third_party_consent = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Testimony"
@@ -160,6 +165,10 @@ class Miracle(BaseModel):
         default=False,
         help_text="Indicates whether the miracle has been selected",
     )
+    visibility = models.CharField(max_length=20, choices=SubmissionVisibility.choices, default=SubmissionVisibility.PUBLIC)
+    review_status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
+    rejection_reason = models.TextField(null=True, blank=True)
+    third_party_consent = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Miracle by {self.soul} - {self.title}"
