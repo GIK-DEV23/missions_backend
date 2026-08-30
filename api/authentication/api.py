@@ -18,14 +18,31 @@ from authentication.schemas import (
     SocialAuthRequest,
     SocialAuthResponse,
     TokenVerificationResponse, TokenRefreshIn,
-    UserData, ManualRegisterRequest
+    UserData, ManualRegisterRequest,
+    RequestPasswordResetIn, ResetPasswordIn
 )
 from authentication.utils import get_auth_for_user, authenticate_social_user
+from authentication import services as auth_services
 from base.schemas import DetailOut
 from users import services as user_services
 from users.models import AuthProvider, User
 
 router = Router(tags=["auth"])
+
+
+def _client_ip(request: HttpRequest) -> str:
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', 'unknown')
+
+
+def _rate_limited(cache_key: str, max_attempts: int, window_seconds: int) -> bool:
+    count = cache.get(cache_key, 0)
+    if count >= max_attempts:
+        return True
+    cache.set(cache_key, count + 1, timeout=window_seconds)
+    return False
 
 
 @router.post(
@@ -244,4 +261,35 @@ def auth_providers(request):
         })
 
     return {"providers": providers_data}
+
+
+@router.post(
+    "/request-password-reset",
+    response={200: DetailOut, 429: DetailOut},
+)
+def request_password_reset_api(request, data: RequestPasswordResetIn):
+    """
+    Always returns success whether or not the email exists — never reveal
+    account existence through this endpoint.
+    """
+    ip = _client_ip(request)
+    if _rate_limited("pwreset_email_{}".format(data.email.lower()), max_attempts=5, window_seconds=3600) or \
+       _rate_limited("pwreset_ip_{}".format(ip), max_attempts=20, window_seconds=3600):
+        raise HttpError(429, "Too many requests. Please try again later.")
+
+    auth_services.request_password_reset(data.email)
+    return 200, {"detail": "If that email exists, a reset link has been sent."}
+
+
+@router.post(
+    "/reset-password",
+    response={200: DetailOut, 400: DetailOut, 429: DetailOut},
+)
+def reset_password_api(request, data: ResetPasswordIn):
+    ip = _client_ip(request)
+    if _rate_limited("pwreset_attempt_ip_{}".format(ip), max_attempts=20, window_seconds=3600):
+        raise HttpError(429, "Too many requests. Please try again later.")
+
+    auth_services.reset_password(data.token, data.new_password)
+    return 200, {"detail": "Password reset successful."}
 
