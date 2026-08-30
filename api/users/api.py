@@ -15,6 +15,27 @@ router = Router(
 
 
 @router.get(
+    "/me/",
+    response={200: schemas.UserProfileOut},
+    auth=jwt_auth
+)
+def get_own_profile_api(request):
+    """Self-serve: view the caller's own full profile."""
+    return schemas.UserProfileOut(**request.user.to_dict(request))
+
+
+@router.patch(
+    "/me/",
+    response={200: schemas.UserProfileOut, 400: DetailOut},
+    auth=jwt_auth
+)
+def update_own_profile_api(request, profile_in: schemas.UserProfileUpdate):
+    """Self-serve: update the caller's own profile. Never touches other users."""
+    user = services.update_own_profile(request.user, profile_in.dict(exclude_unset=True))
+    return 200, schemas.UserProfileOut(**user.to_dict(request))
+
+
+@router.get(
     "/",
     response={200: list[auth_schemas.UserData], 400: DetailOut},
     auth=jwt_auth

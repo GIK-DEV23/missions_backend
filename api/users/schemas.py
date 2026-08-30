@@ -4,6 +4,7 @@ from typing import Optional, List
 from ninja import Schema
 
 from base.schemas import BaseOut, BaseQuery
+from users.constants import GenderType
 
 
 class UserType(str, Enum):
@@ -57,3 +58,36 @@ class RoleOut(Schema):
 
 class PermissionQuery(Schema):
     user_type: Optional[UserType] = None
+
+
+class SavedPartner(Schema):
+    name: str
+    gender: GenderType
+    traveling_from: str
+    dietary: str
+
+
+class UserProfileOut(BaseOut):
+    """Self-serve profile — fuller than UserData, only ever returned to the owning user."""
+    email: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    display_name: str
+    phone_number: Optional[str] = None
+    church: Optional[str] = None
+    bio: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    emergency_contact_confirmed_at: Optional[str] = None
+    saved_partner: Optional[SavedPartner] = None
+    profile_photo: Optional[str] = None
+    roles: List[str] = []
+
+
+class UserProfileUpdate(Schema):
+    phone_number: Optional[str] = None
+    church: Optional[str] = None
+    bio: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    saved_partner: Optional[SavedPartner] = None
