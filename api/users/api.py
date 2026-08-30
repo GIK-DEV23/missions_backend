@@ -12,6 +12,29 @@ from users.services import missioner_restriction_handler
 router = Router(
     tags=["users"],
 )
+me_router = Router(tags=["me"])
+
+
+@me_router.get(
+    "/data-export/",
+    response={200: dict},
+    auth=jwt_auth
+)
+def data_export_api(request):
+    """Kenya DPA: full export of the caller's own data across the system."""
+    return 200, services.export_user_data(request.user)
+
+
+@me_router.delete(
+    "/",
+    response={200: DetailOut},
+    auth=jwt_auth
+)
+def request_account_deletion_api(request):
+    """Kenya DPA: deletion request — deactivates the account immediately,
+    data purge is a separate later process, not an immediate wipe."""
+    services.request_account_deletion(request.user)
+    return 200, {"detail": "Account deletion requested. Your account has been deactivated; data removal will follow."}
 
 
 @router.get(
