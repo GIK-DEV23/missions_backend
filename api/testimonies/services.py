@@ -5,15 +5,19 @@ from typing import Optional
 from django.core.exceptions import ValidationError
 
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.helpers import resolve_fk_by_client_id
+from testimonies.constants import ReviewStatus
 from testimonies.models import Testimony, Miracle
 from testimonies.selectors import testimony_details, miracle_details
 from users.selectors import user_details
+from souls.models import Soul
 from souls.selectors import get_soul
 from missions.selectors import mission_details
 
 
 def create_testimony(data: dict) -> Testimony:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         soul_id = data.get('soul_id')
         user_id = data.get('user_id')
         mission_id = data.get('mission_id')
@@ -81,10 +85,27 @@ def delete_testimony(testimony_id: int) -> Testimony:
         raise CustomValidationError(str(e))
 
 
+def approve_testimony(testimony_id: int) -> Testimony:
+    testimony = testimony_details(testimony_id)
+    testimony.review_status = ReviewStatus.APPROVED
+    testimony.rejection_reason = None
+    testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return testimony
+
+
+def reject_testimony(testimony_id: int, reason: str) -> Testimony:
+    testimony = testimony_details(testimony_id)
+    testimony.review_status = ReviewStatus.REJECTED
+    testimony.rejection_reason = reason
+    testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return testimony
+
+
 # Miracles
 
 def create_miracle(data: dict) -> Miracle:
     try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
         soul_id = data.get('soul_id')
         user_id = data.get('user_id')
         mission_id = data.get('mission_id')
@@ -149,13 +170,30 @@ def delete_miracle(miracle_id: int) -> Miracle:
         raise CustomValidationError(str(e))
 
 
-def miracle_and_testimony_handler(user, kwargs):
-    print("SOUL ID KWARGS:", kwargs)
-    print("USER ID:", user.pk)
+def approve_miracle(miracle_id: int) -> Miracle:
+    miracle = miracle_details(miracle_id)
+    miracle.review_status = ReviewStatus.APPROVED
+    miracle.rejection_reason = None
+    miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return miracle
 
-    soul_id = kwargs.get('testimony_in', {}).soul_id or \
-              kwargs.get('miracle_in', {}).soul_id or \
-              kwargs.get('soul_id')
+
+def reject_miracle(miracle_id: int, reason: str) -> Miracle:
+    miracle = miracle_details(miracle_id)
+    miracle.review_status = ReviewStatus.REJECTED
+    miracle.rejection_reason = reason
+    miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return miracle
+
+
+def miracle_and_testimony_handler(user, kwargs):
+    testimony_in = kwargs.get('testimony_in')
+    miracle_in = kwargs.get('miracle_in')
+    soul_id = (
+        (testimony_in.soul_id if testimony_in else None)
+        or (miracle_in.soul_id if miracle_in else None)
+        or kwargs.get('soul_id')
+    )
 
     if not soul_id:
         return None
