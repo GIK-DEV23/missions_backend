@@ -106,3 +106,16 @@ class ClientIdTests(TestCase):
             user=self.user, update_dict={"payment_timing": PaymentTiming.ON_ARRIVAL}, participant_id=participant.id
         )
         self.assertEqual(updated.payment_timing, PaymentTiming.ON_ARRIVAL)
+
+    def test_bulk_create_gallery_images(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        image = SimpleUploadedFile("test.jpg", b"fake image bytes", content_type="image/jpeg")
+        images = services.bulk_create_gallery_images(
+            mission_id=self.mission.id,
+            uploaded_by_id=self.user.id,
+            images_data=[{"image": image, "title": "Front view", "description": "Morning"}],
+        )
+        self.assertEqual(len(images), 1)
+        self.assertEqual(images[0].title, "Front view")
+        self.assertEqual(images[0].mission_id, self.mission.id)

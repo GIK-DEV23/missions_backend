@@ -222,3 +222,25 @@ class VisibleTestimoniesTests(TestCase):
     def test_owner_sees_both_testimonies(self):
         ids = set(selectors.visible_testimonies(self.owner).values_list("id", flat=True))
         self.assertEqual(ids, {self.personal.id, self.official.id})
+
+
+class HighlightSyncTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="highlight-sync@example.com", password="pass12345", is_superuser=True
+        )
+
+    def test_create_highlight_applied(self):
+        result = services.apply_mutation(self.user, _mutation(
+            entity=SyncEntity.HIGHLIGHT,
+            payload={"title": "H", "content": "C"},
+        ))
+        self.assertEqual(result["status"], SyncMutationStatus.APPLIED)
+
+    def test_highlight_appears_in_changes(self):
+        services.apply_mutation(self.user, _mutation(
+            entity=SyncEntity.HIGHLIGHT,
+            payload={"title": "H", "content": "C", "user_id": self.user.id},
+        ))
+        changes = selectors.changes_since(self.user, None)
+        self.assertEqual(len(changes["highlights"]), 1)

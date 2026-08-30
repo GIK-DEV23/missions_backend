@@ -117,3 +117,77 @@ class MiracleOutSchema(BaseOut):
     review_status: str
     rejection_reason: Optional[str] = None
     third_party_consent: bool = False
+
+
+class HighlightCreateSchema(Schema):
+    client_id: Optional[uuid.UUID] = None
+    title: str
+    content: str
+    soul_id: Optional[int] = None
+    soul_client_id: Optional[uuid.UUID] = None
+    user_id: Optional[int] = None
+    mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
+    visibility: SubmissionVisibility = SubmissionVisibility.PUBLIC
+    third_party_consent: bool = False
+
+
+class HighlightUpdateSchema(Schema):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    soul_id: Optional[int] = None
+    user_id: Optional[int] = None
+    mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: Optional[bool] = None
+    visibility: Optional[SubmissionVisibility] = None
+    third_party_consent: Optional[bool] = None
+
+
+class HighlightOutSchema(BaseOut):
+    client_id: Optional[str] = None
+    title: str
+    content: str
+    soul_id: Optional[int] = None
+    soul_full_name: Optional[str] = None
+    user_id: Optional[int] = None
+    user_full_name: Optional[str] = None
+    mission_id: Optional[int] = None
+    mission_title: Optional[str] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
+    photo_url: Optional[str] = None
+    visibility: str
+    review_status: str
+    rejection_reason: Optional[str] = None
+    third_party_consent: bool = False
+
+
+class PhotoUploadSchema(Schema):
+    """Bulk multi-photo upload — `images` files handled separately via request.FILES."""
+    images_data: str = Field(
+        ...,
+        description="JSON-encoded array of {title?, description?}, one entry per uploaded file, same order"
+    )
+
+
+class TestimonyPhotoOutSchema(BaseOut):
+    testimony_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None
+
+
+class MiraclePhotoOutSchema(BaseOut):
+    miracle_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None
+
+
+class HighlightPhotoOutSchema(BaseOut):
+    highlight_id: int
+    title: str
+    description: str
+    image_url: Optional[str] = None
