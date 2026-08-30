@@ -28,3 +28,17 @@ class PaymentTiming(TextChoices):
     MPESA_NOW = "mpesa_now", _("M-Pesa now")
     PAY_LATER = "pay_later", _("Pay later")
     ON_ARRIVAL = "on_arrival", _("On arrival")
+
+
+class PaymentStatus(TextChoices):
+    UNPAID = "unpaid", _("Unpaid")
+    PENDING = "pending", _("Pending")
+    PAID = "paid", _("Paid")
+    SPONSORED = "sponsored", _("Sponsored")
+
+
+class RegistrationStatus(TextChoices):
+    PENDING = "pending", _("Pending")
+    CONFIRMED = "confirmed", _("Confirmed")
+    WAITLIST = "waitlist", _("Waitlist")
+    CANCELLED = "cancelled", _("Cancelled")
