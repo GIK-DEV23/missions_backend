@@ -15,6 +15,7 @@ from authentication.decorators import require_permission
 from testimonies import schemas, services, selectors
 
 router = Router(tags=["testimonies"])
+highlight_router = Router(tags=["highlights"])
 
 
 @router.get(
@@ -208,3 +209,101 @@ def approve_testimony_api(request, testimony_id: int):
 def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSchema):
     testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+# --- Highlights (separate top-level /api/highlights/ router, per GIK-02 §6) ---
+
+@highlight_router.get(
+    "/",
+    response={200: List[schemas.HighlightOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("list_highlights")
+def highlights_list_api(request, filters: schemas.TestimonyAndMiracleFilterSchema = Query(...)):
+    qs = selectors.highlights_list(filters=filters.dict() if filters else None)
+    response = paginate_response(
+        queryset=qs,
+        request=request,
+        schema=schemas.HighlightOutSchema,
+        page=filters.page,
+        page_size=filters.page_size
+    )
+    return JsonResponse(response, safe=False)
+
+
+@highlight_router.post(
+    "/create/",
+    response={201: schemas.HighlightOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("create_highlight")
+def create_highlight_api(request, highlight_in: schemas.HighlightCreateSchema = Form(...)):
+    photo = request.FILES.get('photo')
+    data = highlight_in.dict()
+    if photo:
+        data['photo'] = photo
+    highlight = services.create_highlight(data)
+    return 201, schemas.HighlightOutSchema(**highlight.to_dict(request))
+
+
+@highlight_router.get(
+    "/{highlight_id}/",
+    response={200: schemas.HighlightOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("view_highlight")
+def highlight_detail_api(request, highlight_id: int):
+    highlight = selectors.highlight_details(highlight_id=highlight_id)
+    return 200, schemas.HighlightOutSchema(**highlight.to_dict(request))
+
+
+@highlight_router.patch(
+    "/{highlight_id}/update/",
+    response={200: schemas.HighlightOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission(
+    "update_highlight",
+    restricted_roles=["missioner_template"],
+    restriction_handler=services.miracle_and_testimony_handler
+)
+def update_highlight_api(request, highlight_id: int, highlight_in: schemas.HighlightUpdateSchema = Form(...)):
+    data = highlight_in.dict(exclude_unset=True)
+    photo = request.FILES.get('photo')
+    if photo:
+        data['photo'] = photo
+    highlight = services.update_highlight(highlight_id=highlight_id, update_dict=data)
+    return 200, schemas.HighlightOutSchema(**highlight.to_dict(request))
+
+
+@highlight_router.delete(
+    "/{highlight_id}/delete/",
+    response={204: str, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("delete_highlight")
+def delete_highlight_api(request, highlight_id: int):
+    services.delete_highlight(highlight_id=highlight_id)
+    return 204, "Highlight deleted successfully"
+
+
+@highlight_router.post(
+    "/{highlight_id}/approve/",
+    response={200: schemas.HighlightOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("approve_highlight")
+def approve_highlight_api(request, highlight_id: int):
+    highlight = services.approve_highlight(highlight_id=highlight_id)
+    return 200, schemas.HighlightOutSchema(**highlight.to_dict(request))
+
+
+@highlight_router.post(
+    "/{highlight_id}/reject/",
+    response={200: schemas.HighlightOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("reject_highlight")
+def reject_highlight_api(request, highlight_id: int, reject_in: schemas.RejectSchema):
+    highlight = services.reject_highlight(highlight_id=highlight_id, reason=reject_in.reason)
+    return 200, schemas.HighlightOutSchema(**highlight.to_dict(request))

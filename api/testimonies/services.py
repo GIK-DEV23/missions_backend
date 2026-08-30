@@ -7,8 +7,8 @@ from django.core.exceptions import ValidationError
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.helpers import resolve_fk_by_client_id
 from testimonies.constants import ReviewStatus
-from testimonies.models import Testimony, Miracle
-from testimonies.selectors import testimony_details, miracle_details
+from testimonies.models import Testimony, Miracle, Highlight
+from testimonies.selectors import testimony_details, miracle_details, highlight_details
 from users.selectors import user_details
 from souls.models import Soul
 from souls.selectors import get_soul
@@ -186,12 +186,98 @@ def reject_miracle(miracle_id: int, reason: str) -> Miracle:
     return miracle
 
 
+def approve_highlight(highlight_id: int) -> Highlight:
+    highlight = highlight_details(highlight_id)
+    highlight.review_status = ReviewStatus.APPROVED
+    highlight.rejection_reason = None
+    highlight.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return highlight
+
+
+def reject_highlight(highlight_id: int, reason: str) -> Highlight:
+    highlight = highlight_details(highlight_id)
+    highlight.review_status = ReviewStatus.REJECTED
+    highlight.rejection_reason = reason
+    highlight.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return highlight
+
+
+def create_highlight(data: dict) -> Highlight:
+    try:
+        data = resolve_fk_by_client_id(data, "soul", Soul)
+        soul_id = data.get('soul_id')
+        user_id = data.get('user_id')
+        mission_id = data.get('mission_id')
+
+        if soul_id is not None:
+            data['soul'] = get_soul(soul_id)
+        if user_id is not None:
+            data['user'] = user_details(user_id)
+        if mission_id is not None:
+            data['mission'] = mission_details(mission_id)
+
+        photo = data.pop('photo', None)
+        highlight = Highlight(**data)
+        if photo:
+            highlight.photo = photo
+        highlight.full_clean()
+        highlight.save()
+        return highlight
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
+def update_highlight(highlight_id: int, update_dict: dict) -> Highlight:
+    try:
+        highlight = highlight_details(highlight_id)
+        soul_id = update_dict.get('soul_id')
+        user_id = update_dict.get('user_id')
+        mission_id = update_dict.get('mission_id')
+
+        if soul_id is not None:
+            highlight.soul = get_soul(soul_id)
+        if user_id is not None:
+            highlight.user = user_details(user_id)
+        if mission_id is not None:
+            highlight.mission = mission_details(mission_id)
+
+        photo = update_dict.get('photo')
+        for key, value in update_dict.items():
+            if key not in ('photo', 'soul_id', 'user_id', 'mission_id') and value is not None:
+                setattr(highlight, key, value)
+        if photo is not None:
+            highlight.photo = photo
+        highlight.full_clean()
+        highlight.save()
+        return highlight
+    except Highlight.DoesNotExist:
+        raise CustomValidationError('Highlight does not exist')
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
+def delete_highlight(highlight_id: int) -> Highlight:
+    highlight = highlight_details(highlight_id)
+    try:
+        highlight.delete()
+        return highlight
+    except Exception as e:
+        raise CustomValidationError(str(e))
+
+
 def miracle_and_testimony_handler(user, kwargs):
+    """Ownership restriction shared by testimony/miracle/highlight update endpoints."""
     testimony_in = kwargs.get('testimony_in')
     miracle_in = kwargs.get('miracle_in')
+    highlight_in = kwargs.get('highlight_in')
     soul_id = (
         (testimony_in.soul_id if testimony_in else None)
         or (miracle_in.soul_id if miracle_in else None)
+        or (highlight_in.soul_id if highlight_in else None)
         or kwargs.get('soul_id')
     )
 
@@ -201,5 +287,5 @@ def miracle_and_testimony_handler(user, kwargs):
     soul = get_soul(soul_id)
 
     if not soul.user or soul.user.pk != user.pk:
-        raise CustomValidationError("You can only edit miracles/testimonies for souls assigned to you.")
+        raise CustomValidationError("You can only edit miracles/testimonies/highlights for souls assigned to you.")
     return None

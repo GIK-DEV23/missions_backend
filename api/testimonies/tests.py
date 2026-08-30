@@ -109,3 +109,46 @@ class ReviewWorkflowTests(TestCase):
         })
         self.assertEqual(testimony.personal_mission_id, pm.id)
         self.assertTrue(testimony.is_personal)
+
+
+class HighlightTests(TestCase):
+    def test_highlight_defaults_to_pending_public(self):
+        highlight = services.create_highlight({"title": "H", "content": "C"})
+        self.assertEqual(highlight.review_status, ReviewStatus.PENDING)
+        self.assertEqual(highlight.visibility, SubmissionVisibility.PUBLIC)
+
+    def test_highlight_resolves_soul_by_client_id(self):
+        soul_client_id = uuid.uuid4()
+        soul = soul_services.create_soul({
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone_number": "+254700000002",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+            "client_id": soul_client_id,
+        })
+        highlight = services.create_highlight({
+            "title": "H", "content": "C", "soul_client_id": soul_client_id,
+        })
+        self.assertEqual(highlight.soul_id, soul.id)
+
+    def test_highlight_approve_reject(self):
+        highlight = services.create_highlight({"title": "H", "content": "C"})
+        rejected = services.reject_highlight(highlight.id, "Needs more detail")
+        self.assertEqual(rejected.review_status, ReviewStatus.REJECTED)
+        approved = services.approve_highlight(highlight.id)
+        self.assertEqual(approved.review_status, ReviewStatus.APPROVED)
+        self.assertIsNone(approved.rejection_reason)
+
+    def test_highlight_update_and_delete(self):
+        from testimonies.selectors import highlight_details
+
+        highlight = services.create_highlight({"title": "H", "content": "C"})
+        updated = services.update_highlight(highlight.id, {"title": "Updated title"})
+        self.assertEqual(updated.title, "Updated title")
+        highlight_id = highlight.id
+        services.delete_highlight(highlight_id)
+        with self.assertRaises(CustomValidationError):
+            highlight_details(highlight_id)
