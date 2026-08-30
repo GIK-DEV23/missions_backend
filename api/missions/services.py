@@ -388,7 +388,8 @@ def create_mission_participant(
     user_id: int | None = None,
     coming_as_couple: bool | None = False,
     partner_name: str | None = "",
-    client_id: uuid.UUID | None = None
+    client_id: uuid.UUID | None = None,
+    payment_timing: str | None = None
 ):
     if not full_name and not user_id:
         raise CustomValidationError("Either full name or user id must be provided.")
@@ -467,7 +468,8 @@ def create_mission_participant(
             gender=gender,
             coming_as_couple=coming_as_couple,
             partner_name=partner_name,
-            client_id=client_id
+            client_id=client_id,
+            payment_timing=payment_timing
         )
     except IntegrityError as e:
         raise CustomValidationError(parse_integrity_error(e))

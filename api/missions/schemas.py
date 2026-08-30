@@ -27,6 +27,12 @@ class GenderChoices(str, Enum):
     FEMALE = "female"
 
 
+class PaymentTimingChoices(str, Enum):
+    MPESA_NOW = "mpesa_now"
+    PAY_LATER = "pay_later"
+    ON_ARRIVAL = "on_arrival"
+
+
 class LocationsFilterSchema(BaseQuery):
     parent_location_id: int | None = None
     category: str | None = None
@@ -222,6 +228,7 @@ class MissionParticipantCreateSchema(Schema):
     gender: GenderChoices
     coming_as_couple: bool | None = False
     partner_name: str | None = ""
+    payment_timing: PaymentTimingChoices | None = None
 
 
 class MissionParticipantUpdateSchema(Schema):
@@ -234,6 +241,7 @@ class MissionParticipantUpdateSchema(Schema):
     diet_advisory: str | None = None
     need_facilitation: bool | None
     facilitation_amount: Decimal | None = None
+    payment_timing: PaymentTimingChoices | None = None
 
 
 class BulkUpdateMissionJIASchema(Schema):
@@ -256,6 +264,7 @@ class MissionParticipantOutSchema(BaseOut):
     coming_as_couple: bool | None = None
     partner_name: str | None = None
     gender: str
+    payment_timing: str | None = None
 
 
 class ReportCreateSchema(Schema):
