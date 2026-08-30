@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 
 from base.utils.exceptions import CustomValidationError, handle_cleaning_error
 from base.utils.helpers import resolve_fk_by_client_id
+from testimonies.constants import ReviewStatus
 from testimonies.models import Testimony, Miracle
 from testimonies.selectors import testimony_details, miracle_details
 from users.selectors import user_details
@@ -84,6 +85,22 @@ def delete_testimony(testimony_id: int) -> Testimony:
         raise CustomValidationError(str(e))
 
 
+def approve_testimony(testimony_id: int) -> Testimony:
+    testimony = testimony_details(testimony_id)
+    testimony.review_status = ReviewStatus.APPROVED
+    testimony.rejection_reason = None
+    testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return testimony
+
+
+def reject_testimony(testimony_id: int, reason: str) -> Testimony:
+    testimony = testimony_details(testimony_id)
+    testimony.review_status = ReviewStatus.REJECTED
+    testimony.rejection_reason = reason
+    testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return testimony
+
+
 # Miracles
 
 def create_miracle(data: dict) -> Miracle:
@@ -151,6 +168,22 @@ def delete_miracle(miracle_id: int) -> Miracle:
         return miracle
     except Exception as e:
         raise CustomValidationError(str(e))
+
+
+def approve_miracle(miracle_id: int) -> Miracle:
+    miracle = miracle_details(miracle_id)
+    miracle.review_status = ReviewStatus.APPROVED
+    miracle.rejection_reason = None
+    miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return miracle
+
+
+def reject_miracle(miracle_id: int, reason: str) -> Miracle:
+    miracle = miracle_details(miracle_id)
+    miracle.review_status = ReviewStatus.REJECTED
+    miracle.rejection_reason = reason
+    miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    return miracle
 
 
 def miracle_and_testimony_handler(user, kwargs):

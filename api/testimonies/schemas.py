@@ -9,6 +9,7 @@ from ninja import Schema
 from pydantic import Field
 
 from base.schemas import BaseQuery, BaseOut
+from testimonies.constants import SubmissionVisibility, ReviewStatus
 
 
 class TestimonyCreateSchema(Schema):
@@ -19,6 +20,10 @@ class TestimonyCreateSchema(Schema):
     soul_client_id: Optional[uuid.UUID] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
+    visibility: SubmissionVisibility = SubmissionVisibility.PUBLIC
+    third_party_consent: bool = False
 
 
 class TestimonyUpdateSchema(Schema):
@@ -27,7 +32,15 @@ class TestimonyUpdateSchema(Schema):
     soul_id: Optional[int] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: Optional[bool] = None
     is_selected: Optional[bool] = None
+    visibility: Optional[SubmissionVisibility] = None
+    third_party_consent: Optional[bool] = None
+
+
+class RejectSchema(Schema):
+    reason: str
 
 
 class TestimonyOutSchema(BaseOut):
@@ -40,8 +53,14 @@ class TestimonyOutSchema(BaseOut):
     user_full_name: Optional[str] = None
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
     photo_url: Optional[str] = None
     is_selected: bool = False
+    visibility: str
+    review_status: str
+    rejection_reason: Optional[str] = None
+    third_party_consent: bool = False
 
 
 class TestimonyAndMiracleFilterSchema(BaseQuery):
@@ -51,6 +70,7 @@ class TestimonyAndMiracleFilterSchema(BaseQuery):
     created_before: Optional[datetime.date] = None
     created_after: Optional[datetime.date] = None
     is_selected: Optional[bool] = None
+    review_status: Optional[ReviewStatus] = None
     search: Optional[str] = None
 
 
@@ -62,6 +82,10 @@ class MiracleCreateSchema(Schema):
     soul_client_id: Optional[uuid.UUID] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
+    visibility: SubmissionVisibility = SubmissionVisibility.PUBLIC
+    third_party_consent: bool = False
 
 
 class MiracleUpdateSchema(Schema):
@@ -70,6 +94,10 @@ class MiracleUpdateSchema(Schema):
     soul_id: Optional[int] = None
     user_id: Optional[int] = None
     mission_id: Optional[int] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: Optional[bool] = None
+    visibility: Optional[SubmissionVisibility] = None
+    third_party_consent: Optional[bool] = None
 
 
 class MiracleOutSchema(BaseOut):
@@ -82,4 +110,10 @@ class MiracleOutSchema(BaseOut):
     user_full_name: Optional[str] = None
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
+    personal_mission_id: Optional[int] = None
+    is_personal: bool = False
     photo_url: Optional[str] = None
+    visibility: str
+    review_status: str
+    rejection_reason: Optional[str] = None
+    third_party_consent: bool = False

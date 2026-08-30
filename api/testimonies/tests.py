@@ -6,6 +6,7 @@ from base.utils.exceptions import CustomValidationError
 from souls import services as soul_services
 from souls.constants import JourneyStage
 from testimonies import services
+from testimonies.constants import ReviewStatus, SubmissionVisibility
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -49,3 +50,62 @@ class ClientIdTests(TestCase):
             "soul_client_id": soul_client_id,
         })
         self.assertEqual(miracle.soul_id, soul.id)
+
+
+class ReviewWorkflowTests(TestCase):
+    def test_testimony_defaults_to_pending_public(self):
+        testimony = services.create_testimony({"title": "T", "content": "C"})
+        self.assertEqual(testimony.review_status, ReviewStatus.PENDING)
+        self.assertEqual(testimony.visibility, SubmissionVisibility.PUBLIC)
+        self.assertIsNone(testimony.rejection_reason)
+
+    def test_approve_testimony_clears_prior_rejection(self):
+        testimony = services.create_testimony({"title": "T", "content": "C"})
+        services.reject_testimony(testimony.id, "Not appropriate")
+        approved = services.approve_testimony(testimony.id)
+        self.assertEqual(approved.review_status, ReviewStatus.APPROVED)
+        self.assertIsNone(approved.rejection_reason)
+
+    def test_reject_testimony_stores_reason(self):
+        testimony = services.create_testimony({"title": "T", "content": "C"})
+        rejected = services.reject_testimony(testimony.id, "Contains identifying details")
+        self.assertEqual(rejected.review_status, ReviewStatus.REJECTED)
+        self.assertEqual(rejected.rejection_reason, "Contains identifying details")
+
+    def test_create_testimony_accepts_visibility_and_consent(self):
+        testimony = services.create_testimony({
+            "title": "T", "content": "C",
+            "visibility": SubmissionVisibility.ANONYMOUS,
+            "third_party_consent": True,
+        })
+        self.assertEqual(testimony.visibility, SubmissionVisibility.ANONYMOUS)
+        self.assertTrue(testimony.third_party_consent)
+
+    def test_miracle_approve_reject_mirror_testimony(self):
+        miracle = services.create_miracle({"title": "M", "content": "C"})
+        self.assertEqual(miracle.review_status, ReviewStatus.PENDING)
+        rejected = services.reject_miracle(miracle.id, "Needs more detail")
+        self.assertEqual(rejected.review_status, ReviewStatus.REJECTED)
+        approved = services.approve_miracle(miracle.id)
+        self.assertEqual(approved.review_status, ReviewStatus.APPROVED)
+        self.assertIsNone(approved.rejection_reason)
+
+    def test_testimony_can_link_personal_mission(self):
+        from personal_missions import services as pm_services
+        from personal_missions.constants import PersonalMissionType
+        from users.models import User
+
+        owner = User.objects.create_user(
+            email="pm-owner@example.com", password="pass1234",
+            username="pmowner", first_name="PM", last_name="Owner",
+        )
+        pm = pm_services.create_personal_mission(owner, {
+            "name": "Street outreach", "type": PersonalMissionType.ONE_TIME,
+            "start_date": "2026-01-01",
+        })
+        testimony = services.create_testimony({
+            "title": "T", "content": "C",
+            "personal_mission_id": pm.id, "is_personal": True,
+        })
+        self.assertEqual(testimony.personal_mission_id, pm.id)
+        self.assertTrue(testimony.is_personal)
