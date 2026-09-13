@@ -19,149 +19,91 @@ GIK missions related backend functionalities and apis.
    ```bash
    cp .env.example .env
    ```
-   
-   Edit `.env` and configure your database settings:
+
+   Edit `.env` and configure your settings. The database host must match the
+   compose service name (`db`), not the container name:
    ```env
+   DJANGO_SECRET_KEY=your-secret-key-here
    DATABASE_NAME=missions_db
-   DATABASE_USER=missions_user
-   DATABASE_PASSWORD=your_secure_password
-   DATABASE_HOST=missions_postgres
+   DATABASE_USER=postgres
+   DATABASE_PASSWORD=postgres
+   DATABASE_HOST=db
    DATABASE_PORT=5432
+   REDIS_URL=redis://redis:6379/1
    DJANGO_SUPERUSER_USERNAME=admin
    DJANGO_SUPERUSER_EMAIL=admin@gmail.com
-   DJANGO_SUPERUSER_PASSWORD=testpassword
+   DJANGO_SUPERUSER_PASSWORD=adminpassword
    ```
 
 3. **Build and run the application**
+
+   The `backend` service defaults to pulling a prebuilt image from GHCR
+   (`ghcr.io/paulwritescode/missions_backend:latest`). For local development,
+   build the image yourself with `--build` so the local `Dockerfile` is used:
    ```bash
    docker compose up --build
+   ```
+
+   > **Note:** Without `--build`, `docker compose up` will try to *pull* the
+   > production image instead of building your local code. Always use `--build`
+   > (or set `BACKEND_IMAGE=<your-local-tag>`) when running local changes.
+
+   To run only the core services for backend development (skip `nginx`, which
+   needs a `./frontend/dist` build and binds ports 80/443, and `watchtower`,
+   which is a production auto-updater):
+   ```bash
+   docker compose up --build db redis backend
    ```
 
 4. **Access the application**
    - API: http://127.0.0.1:9050
    - Documentation: http://127.0.0.1:9050/api/docs
+   - Health check: http://127.0.0.1:9050/health/
    - Admin panel: http://127.0.0.1:9050/admin
-   - admin credentials: (`api/superuser_setup.py`) uses env vars mentioned above to create superuser automatically
+   - Admin credentials: `api/superuser_setup.py` runs automatically on startup
+     and creates a superuser from the `DJANGO_SUPERUSER_*` env vars above.
 
 ## Project Structure
-This will change over time, but here is the current structure:
+This will change over time. Each Django app follows a consistent layout
+(`api.py`, `models.py`, `schemas.py`, `selectors.py`, `services.py`,
+`filters.py`, `tests.py`, plus `migrations/`). Here is the current structure:
 ```
 missions_backend
-   ├── api
-   │   ├── authentication
-   │   │   ├── api.py
-   │   │   ├── backends
-   │   │   │   ├── apple.py
-   │   │   │   ├── base.py
-   │   │   │   ├── google.py
-   │   │   │   ├── __init__.py
-   │   │   │   ├── jwt.py
-   │   │   │   └── registry.py
-   │   │   ├── constants.py
-   │   │   ├── __init__.py
-   │   │   ├── middleware.py
-   │   │   ├── permissions_list.py
-   │   │   ├── permissions.py
-   │   │   ├── schemas.py
-   │   │   └── utils.py
-   │   ├── base
-   │   │   ├── api.py
-   │   │   ├── apps.py
-   │   │   ├── filters.py
-   │   │   ├── __init__.py
-   │   │   ├── models.py
-   │   │   ├── schemas.py
-   │   │   └── utils
-   │   │       ├── exceptions.py
-   │   │       ├── file_parser.py
-   │   │       ├── helpers.py
-   │   │       └── __init__.py
-   │   ├── manage.py
-   │   ├── missions
-   │   │   ├── admin.py
-   │   │   ├── api.py
-   │   │   ├── apps.py
-   │   │   ├── constants.py
-   │   │   ├── filters.py
-   │   │   ├── __init__.py
-   │   │   ├── migrations
-   │   │   │   ├── 0001_initial.py
-   │   │   │   ├── 0002_missiongallery.py
-   │   │   │   ├── 0003_mission_created_by.py
-   │   │   │   ├── 0004_alter_mission_end_date_alter_mission_start_date.py
-   │   │   │   └── __init__.py
-   │   │   ├── models.py
-   │   │   ├── schemas.py
-   │   │   ├── selectors.py
-   │   │   ├── services.py
-   │   │   └── tests.py
-   │   ├── project
-   │   │   ├── api.py
-   │   │   ├── asgi.py
-   │   │   ├── __init__.py
-   │   │   ├── settings.py
-   │   │   ├── urls.py
-   │   │   └── wsgi.py
-   │   ├── souls
-   │   │   ├── admin.py
-   │   │   ├── api.py
-   │   │   ├── apps.py
-   │   │   ├── constants.py
-   │   │   ├── filters.py
-   │   │   ├── __init__.py
-   │   │   ├── migrations
-   │   │   │   ├── 0001_initial.py
-   │   │   │   └── __init__.py
-   │   │   ├── models.py
-   │   │   ├── schemas.py
-   │   │   ├── selectors.py
-   │   │   ├── services.py
-   │   │   └── tests.py
-   │   ├── superuser_setup.py
-   │   ├── testimonies
-   │   │   ├── admin.py
-   │   │   ├── api.py
-   │   │   ├── apps.py
-   │   │   ├── filters.py
-   │   │   ├── __init__.py
-   │   │   ├── migrations
-   │   │   │   ├── 0001_initial.py
-   │   │   │   ├── 0002_miracle_is_selected_alter_testimony_is_selected.py
-   │   │   │   └── __init__.py
-   │   │   ├── models.py
-   │   │   ├── schemas.py
-   │   │   ├── selectors.py
-   │   │   ├── services.py
-   │   │   └── tests.py
-   │   └── users
-   │       ├── admin.py
-   │       ├── api.py
-   │       ├── apps.py
-   │       ├── constants.py
-   │       ├── decorators.py
-   │       ├── filters.py
-   │       ├── __init__.py
-   │       ├── managers.py
-   │       ├── migrations
-   │       │   ├── 0001_initial.py
-   │       │   ├── 0002_role_is_archived.py
-   │       │   └── __init__.py
-   │       ├── models.py
-   │       ├── schemas.py
-   │       ├── selectors.py
-   │       ├── services.py
-   │       └── tests.py
-   ├── docker-compose.yaml
-   ├── Dockerfile
-   ├── .env
-   ├── .env.example
-   ├── .gitignore
-   ├── poetry.lock
-   ├── pyproject.toml
-   └── README.md
-
-15 directories, 98 files
+├── api
+│   ├── audit_logs        # Audit/activity logging
+│   ├── authentication    # JWT + Google/Apple OAuth backends, permissions
+│   │   └── backends      # apple.py, base.py, google.py, jwt.py, registry.py
+│   ├── base              # Shared models, schemas, filters, utils
+│   │   └── utils         # exceptions.py, file_parser.py, helpers.py
+│   ├── missions          # Missions + analytics.py
+│   ├── notifications     # User notifications
+│   ├── personal_missions # Personal (individual) missions
+│   ├── project           # Django project: settings.py, urls.py, api.py (Ninja root)
+│   ├── souls             # Souls / progress updates
+│   ├── sync              # Offline sync endpoints
+│   ├── testimonies       # Testimonies, miracles, highlights
+│   ├── users             # Custom user model, roles, managers
+│   ├── manage.py
+│   └── superuser_setup.py  # Auto-creates superuser on startup
+├── deploy
+│   ├── terraform         # GCP VM provisioning (main.tf, variables.tf, ...)
+│   ├── FRONTEND_DEPLOY_VITE.md
+│   └── GITOPS.md         # Pull-based GitOps deploy notes
+├── .github/workflows     # CI: build-and-push.yaml, deploy.yaml
+├── API_DOCUMENTATION.org # Full API reference
+├── docker-compose.yaml
+├── Dockerfile
+├── nginx.conf            # Reverse proxy config (production)
+├── .env.example
+├── poetry.lock
+├── pyproject.toml
+└── README.md
 ```
+
+The API is served with **Django Ninja**. Routers are registered in
+`api/project/api.py` under these prefixes: `auth/`, `users/`, `missions/`,
+`souls/`, `testimonies/`, `sync/`, `personal-missions/`, `notifications/`,
+`audit_logs/`.
 
 ## Services
 
@@ -175,8 +117,32 @@ missions_backend
 
 ### Database (PostgreSQL)
 - **Container**: `missions_postgres`
+- **Image**: `postgres:15`
 - **Port**: 5435 (maps to container port 5432)
 - **Data persistence**: Volume `postgres_data`
+
+### Cache / Redis
+- **Container**: `missions_redis`
+- **Image**: `redis:latest`
+- **Port**: 6381 (maps to container port 6379)
+- **Used for**: Django cache backend (`django-redis`), configured via `REDIS_URL`
+- **Data persistence**: Volume `redis_data`
+
+### Nginx (production reverse proxy)
+- **Container**: `missions_nginx`
+- **Ports**: 80 / 443
+- **Serves**: the Vite frontend build from `./frontend/dist` plus `/media` and
+  `/static`. This directory is untracked by git; populate it per
+  `deploy/FRONTEND_DEPLOY_VITE.md`.
+- **Note**: Not needed for local backend development. Start only
+  `db redis backend` to skip it.
+
+### Watchtower (production auto-updater)
+- **Container**: `missions_watchtower`
+- **Image**: `nickfedor/watchtower:latest` (maintained fork)
+- **Purpose**: Pull-based GitOps — polls GHCR and recreates the backend
+  container when CI pushes a new image (`--label-enable` limits it to the
+  backend only). Not needed locally. See `deploy/GITOPS.md`.
 
 ## Development Commands
 
@@ -252,6 +218,7 @@ docker compose exec backend poetry run python api/manage.py collectstatic
 | `DATABASE_PASSWORD`         | PostgreSQL password                          | `postgres`                                      |
 | `DATABASE_HOST`             | PostgreSQL host                              | `db`                                            |
 | `DATABASE_PORT`             | PostgreSQL port                              | `5432`                                          |
+| `REDIS_URL`                 | Redis connection URL (Django cache backend)  | `redis://redis:6379/1`                          |
 | `DJANGO_SUPERUSER_USERNAME` | Django admin username                        | `admin`                                         |
 | `DJANGO_SUPERUSER_EMAIL`    | Django admin email                           | `admin@gmail.com`                               |
 | `DJANGO_SUPERUSER_PASSWORD` | Django admin password                        | `adminpassword`                                 |
@@ -267,6 +234,18 @@ docker compose exec backend poetry run python api/manage.py collectstatic
 | `APPLE_KEY_ID`              | Apple private key ID                         | -                                               |
 | `APPLE_PRIVATE_KEY`         | Apple private key content                    | -                                               |
 | `APPLE_REDIRECT_URI`        | Apple OAuth redirect URI                     | -                                               |
+| `ALLOW_ADMIN_SITE`          | Enable/disable the Django admin site         | `True`                                          |
+| `ADMIN_URL`                 | URL path for the admin site                  | `admin/`                                        |
+| `CSRF_TRUSTED_ORIGINS`      | Comma-separated trusted origins for CSRF     | `https://*.127.0.0.1`                           |
+| `EMAIL_HOST`                | SMTP host (blank = print emails to console)  | -                                               |
+| `EMAIL_PORT`                | SMTP port                                    | `587`                                           |
+| `EMAIL_HOST_USER`           | SMTP username                                | -                                               |
+| `EMAIL_HOST_PASSWORD`       | SMTP password                                | -                                               |
+| `EMAIL_USE_TLS`             | Use TLS for SMTP                             | `True`                                          |
+| `DEFAULT_FROM_EMAIL`        | Default "from" address for outgoing email    | `no-reply@gik-missions.org`                     |
+| `PASSWORD_RESET_DEEP_LINK_BASE` | Mobile deep link base for password reset | `gikmissions://reset-password`                  |
+| `BACKEND_IMAGE`             | Backend image to run (override for local build) | `ghcr.io/paulwritescode/missions_backend:latest` |
+| `WATCHTOWER_INTERVAL`       | Watchtower poll interval (seconds)           | `60`                                            |
 
 
 ## Troubleshooting
@@ -311,6 +290,24 @@ If you need to start fresh:
 docker compose down --rmi all --volumes --remove-orphans
 docker compose up --build
 ```
+
+## Deployment & CI/CD
+
+Deployment uses a **pull-based GitOps** model rather than SSH-push:
+
+- **CI** (`.github/workflows/`):
+  - `build-and-push.yaml` builds the backend image and pushes it to GHCR
+    (`ghcr.io/paulwritescode/missions_backend`).
+  - `deploy.yaml` handles the deploy-side automation.
+- **Infrastructure** (`deploy/terraform/`): provisions the GCP VM that runs the
+  stack. See `deploy/terraform/README.md`.
+- **Runtime updates**: `watchtower` on the VM polls GHCR and recreates the
+  backend container when a new image is pushed — no manual deploy needed for
+  code changes. See `deploy/GITOPS.md`.
+- **Frontend**: the Vite build is served by `nginx` from `./frontend/dist`,
+  which is untracked by git. See `deploy/FRONTEND_DEPLOY_VITE.md`.
+
+Full API reference lives in `API_DOCUMENTATION.org`.
 
 ## Production Considerations
 

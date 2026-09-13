@@ -4,7 +4,7 @@ Services for testimonies and miracles - create/update/delete business logic
 from typing import Optional
 from django.core.exceptions import ValidationError
 
-from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.exceptions import CustomValidationError, ForbiddenError, handle_cleaning_error
 from base.utils.helpers import resolve_fk_by_client_id
 from testimonies.constants import ReviewStatus
 from testimonies.models import Testimony, Miracle
@@ -201,5 +201,68 @@ def miracle_and_testimony_handler(user, kwargs):
     soul = get_soul(soul_id)
 
     if not soul.user or soul.user.pk != user.pk:
-        raise CustomValidationError("You can only edit miracles/testimonies for souls assigned to you.")
+        raise ForbiddenError("You can only edit miracles/testimonies for souls assigned to you.")
     return None
+
+
+def check_anonymous_rate_limit(device_token_hash: str) -> bool:
+    import hashlib
+    from datetime import timedelta
+    from django.conf import settings
+    from django.utils import timezone
+    from testimonies.models import AnonymousSubmissionToken
+
+    rate_limit = getattr(settings, 'ANON_SUBMISSION_RATE_LIMIT', 5)
+    window_hours = getattr(settings, 'ANON_SUBMISSION_RATE_WINDOW_HOURS', 24)
+    window_start_threshold = timezone.now() - timedelta(hours=window_hours)
+
+    token, created = AnonymousSubmissionToken.objects.get_or_create(
+        device_token_hash=device_token_hash
+    )
+
+    if not created and token.window_start < window_start_threshold:
+        token.window_start = timezone.now()
+        token.submission_count = 0
+        token.save(update_fields=['window_start', 'submission_count'])
+
+    return token.submission_count < rate_limit
+
+
+def record_anonymous_submission(device_token_hash: str):
+    from django.utils import timezone
+    from testimonies.models import AnonymousSubmissionToken
+
+    AnonymousSubmissionToken.objects.filter(device_token_hash=device_token_hash).update(
+        submission_count=models.F('submission_count') + 1,
+        last_submission_at=timezone.now()
+    )
+
+
+def hash_device_token(device_token: str) -> str:
+    import hashlib
+    return hashlib.sha256(device_token.encode()).hexdigest()
+
+
+def create_anonymous_testimony(data: dict) -> Testimony:
+    from django.db import models
+
+    device_token = data.pop('device_token')
+    device_token_hash = hash_device_token(device_token)
+
+    if not check_anonymous_rate_limit(device_token_hash):
+        raise CustomValidationError("Rate limit exceeded. Please try again later.")
+
+    mission_id = data.get('mission_id')
+    if mission_id is not None:
+        data['mission'] = mission_details(mission_id)
+
+    try:
+        testimony = Testimony(**data)
+        testimony.full_clean()
+        testimony.save()
+        record_anonymous_submission(device_token_hash)
+        return testimony
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError(str(e))

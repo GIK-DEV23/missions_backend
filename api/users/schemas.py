@@ -14,6 +14,28 @@ class UserType(str, Enum):
     EXEC = 'exec'
 
 
+class TimeFilter(str, Enum):
+    LIFETIME = 'lifetime'
+    THIS_YEAR = 'this_year'
+    LAST_YEAR = 'last_year'
+    LAST_6_MONTHS = 'last_6_months'
+    LAST_3_MONTHS = 'last_3_months'
+    LAST_MONTH = 'last_month'
+
+
+class MeStatsQuery(Schema):
+    time_filter: Optional[TimeFilter] = TimeFilter.LIFETIME
+
+
+class MeStatsOut(Schema):
+    checks_in_this_week: int
+    souls_won: int
+    in_follow_up: int
+    missions_count: int
+    souls_with_data_count: int
+    souls_without_consent_count: int
+
+
 class RoleQuery(BaseQuery):
     name: Optional[str] = None
 

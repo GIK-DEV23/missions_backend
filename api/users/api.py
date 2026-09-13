@@ -24,6 +24,16 @@ def get_own_profile_api(request):
     return schemas.UserProfileOut(**request.user.to_dict(request))
 
 
+@router.get(
+    "/me/stats/",
+    response={200: schemas.MeStatsOut},
+    auth=jwt_auth
+)
+def get_own_stats_api(request, params: schemas.MeStatsQuery = Query(...)):
+    stats = selectors.get_user_stats(request.user, params.time_filter)
+    return schemas.MeStatsOut(**stats)
+
+
 @router.patch(
     "/me/",
     response={200: schemas.UserProfileOut, 400: DetailOut},

@@ -6,7 +6,7 @@ from typing import Optional
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
+from souls.constants import JourneyStage, ContactOutcome, FollowUpHealth, ProgressUpdateType, ProgressUpdateOutcome
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -34,6 +34,7 @@ class SoulsQuery(BaseQuery):
     age_group: Optional[AgeGroupCategory] = None
     location: Optional[int] = None
     status: Optional[JourneyStage] = None
+    follow_up_health: Optional[FollowUpHealth] = None
     search: Optional[str] = None
     created_before: Optional[datetime.date] = None
     created_after: Optional[datetime.date] = None
@@ -120,6 +121,7 @@ class SoulOut(BaseOut):
     description: Optional[str] = None
     next_check_in_at: Optional[str] = None
     last_contacted_at: Optional[str] = None
+    follow_up_health: Optional[str] = None
     consent_given: bool = False
     consent_recorded_at: Optional[str] = None
     do_not_contact: bool = False
@@ -169,3 +171,25 @@ class ProgressUpdateQuery(BaseQuery):
     """Schema for querying progress updates with pagination."""
     soul_id: Optional[int] = None
     is_desc: Optional[bool] = True
+
+
+class SoulAssignmentOut(BaseOut):
+    soul_id: int
+    soul_full_name: str
+    user_id: int
+    user_full_name: str
+    assigned_by_id: Optional[int] = None
+    assigned_by_full_name: Optional[str] = None
+    is_active: bool
+    notes: str
+
+
+class SoulAssignmentCreate(Schema):
+    soul_id: int
+    user_id: int
+    notes: Optional[str] = ""
+
+
+class SoulAssignmentUpdate(Schema):
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None

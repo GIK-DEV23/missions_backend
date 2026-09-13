@@ -1,11 +1,82 @@
+from datetime import timedelta
 from typing import Optional
 
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.utils import timezone
 
 from authentication import permissions_list
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, NotFoundError
 from users.filters import UserFilter, RoleFilter
 from users.models import User, Role
+from users.schemas import TimeFilter
+
+
+def _get_time_filter_start(time_filter: TimeFilter):
+    now = timezone.now()
+    if time_filter == TimeFilter.LIFETIME:
+        return None
+    elif time_filter == TimeFilter.THIS_YEAR:
+        return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == TimeFilter.LAST_YEAR:
+        last_year = now.year - 1
+        return now.replace(year=last_year, month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif time_filter == TimeFilter.LAST_6_MONTHS:
+        return now - timedelta(days=180)
+    elif time_filter == TimeFilter.LAST_3_MONTHS:
+        return now - timedelta(days=90)
+    elif time_filter == TimeFilter.LAST_MONTH:
+        return now - timedelta(days=30)
+    return None
+
+
+def _get_time_filter_end(time_filter: TimeFilter):
+    if time_filter == TimeFilter.LAST_YEAR:
+        now = timezone.now()
+        return now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    return None
+
+
+def get_user_stats(user: User, time_filter: TimeFilter = TimeFilter.LIFETIME) -> dict:
+    from souls.models import Soul, ProgressUpdate
+    from souls.constants import ContactOutcome
+
+    now = timezone.now()
+    week_start = now - timedelta(days=now.weekday())
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    checks_in_this_week = ProgressUpdate.objects.filter(
+        author=user,
+        update_date__gte=week_start.date()
+    ).count()
+
+    time_start = _get_time_filter_start(time_filter)
+    time_end = _get_time_filter_end(time_filter)
+
+    user_souls = Soul.objects.filter(user=user, deleted_at__isnull=True)
+
+    if time_start:
+        user_souls = user_souls.filter(date_added__gte=time_start.date())
+    if time_end:
+        user_souls = user_souls.filter(date_added__lt=time_end.date())
+
+    souls_won = user_souls.filter(contact_outcome=ContactOutcome.BORN_AGAIN).count()
+
+    in_follow_up = user_souls.exclude(contact_outcome=ContactOutcome.BORN_AGAIN).count()
+
+    missions_count = user_souls.exclude(mission__isnull=True).values('mission').distinct().count()
+
+    all_user_souls = Soul.objects.filter(user=user, deleted_at__isnull=True)
+    souls_with_data_count = all_user_souls.count()
+    souls_without_consent_count = all_user_souls.filter(consent_given=False).count()
+
+    return {
+        'checks_in_this_week': checks_in_this_week,
+        'souls_won': souls_won,
+        'in_follow_up': in_follow_up,
+        'missions_count': missions_count,
+        'souls_with_data_count': souls_with_data_count,
+        'souls_without_consent_count': souls_without_consent_count,
+    }
 
 
 def role_details(role_id: int) -> Optional[Role]:
@@ -13,7 +84,7 @@ def role_details(role_id: int) -> Optional[Role]:
     try:
         return Role.objects.get(id=role_id)
     except Role.DoesNotExist:
-        raise CustomValidationError("Role with the given ID does not exist")
+        raise NotFoundError("Role with the given ID does not exist")
 
 
 def user_details(user_id: Optional[int] = None, email: Optional[str] = None) -> Optional[User]:
@@ -27,7 +98,7 @@ def user_details(user_id: Optional[int] = None, email: Optional[str] = None) -> 
         else:
             raise CustomValidationError("Either user_id or email must be provided")
     except User.DoesNotExist:
-        raise CustomValidationError("User with the given identifier does not exist")
+        raise NotFoundError("User with the given identifier does not exist")
 
 
 def users_list(filters: dict = None):

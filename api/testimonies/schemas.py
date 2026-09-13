@@ -117,3 +117,12 @@ class MiracleOutSchema(BaseOut):
     review_status: str
     rejection_reason: Optional[str] = None
     third_party_consent: bool = False
+
+
+class AnonymousTestimonyCreate(Schema):
+    device_token: str
+    title: str
+    content: str
+    mission_id: int
+    visibility: SubmissionVisibility = SubmissionVisibility.PUBLIC
+    third_party_consent: bool = False

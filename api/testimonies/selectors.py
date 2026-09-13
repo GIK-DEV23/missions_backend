@@ -4,7 +4,7 @@ Selectors for testimonies and miracles - simple helpers that return QuerySets or
 from typing import Optional
 from django.db.models import Q
 
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import NotFoundError
 from testimonies.filters import TestimonyFilter, MiracleFilter
 from testimonies.models import Testimony, Miracle
 
@@ -21,7 +21,7 @@ def testimony_details(testimony_id: int) -> Testimony:
    try:
          return Testimony.objects.get(id=testimony_id)
    except Testimony.DoesNotExist:
-       raise CustomValidationError("Testimony with ID {} does not exist".format(testimony_id))
+       raise NotFoundError("Testimony with ID {} does not exist".format(testimony_id))
 
 
 def miracles_list(filters: Optional[dict] = None):
@@ -36,4 +36,4 @@ def miracle_details(miracle_id: int) -> Miracle:
     try:
         return Miracle.objects.get(id=miracle_id)
     except Miracle.DoesNotExist:
-        raise CustomValidationError("Miracle with ID {} does not exist".format(miracle_id))
+        raise NotFoundError("Miracle with ID {} does not exist".format(miracle_id))

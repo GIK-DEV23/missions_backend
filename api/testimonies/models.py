@@ -269,3 +269,16 @@ class Highlight(BaseModel):
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
         })
         return data
+
+
+class AnonymousSubmissionToken(models.Model):
+    device_token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    submission_count = models.PositiveIntegerField(default=0)
+    window_start = models.DateTimeField(auto_now_add=True)
+    last_submission_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "anonymous_submission_tokens"
+
+    def __str__(self):
+        return "AnonymousToken {} ({} submissions)".format(self.device_token_hash[:8], self.submission_count)

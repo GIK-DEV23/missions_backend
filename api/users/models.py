@@ -133,7 +133,7 @@ class User(AbstractUser, BaseModel):
 
     # Core fields (matching your schema)
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, default='')
     email = models.EmailField(unique=True)
     phone_number = PhoneNumberField(null=True, blank=True)
     # Username fields
@@ -156,7 +156,7 @@ class User(AbstractUser, BaseModel):
 
     # Use email as the unique identifier for authentication
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+    REQUIRED_FIELDS = ['username', 'first_name']
 
     # Use custom manager
     objects = UserManager()
@@ -258,6 +258,10 @@ class User(AbstractUser, BaseModel):
             "id": self.pk,
             "display_name": self.get_display_name(),
             "roles": list(self.roles.values_list('name', flat=True)),
+            "date_joined": self.date_joined.isoformat() if self.date_joined else None,
+            "phone_number": str(self.phone_number) if self.phone_number else None,
+            "bio": self.bio,
+            "church": self.church,
         })
         return data
 

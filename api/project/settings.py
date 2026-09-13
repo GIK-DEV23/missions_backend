@@ -152,8 +152,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 NINJA_JWT = {
-    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=10),
-    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": datetime.timedelta(minutes=45),
+    "REFRESH_TOKEN_LIFETIME": datetime.timedelta(days=90),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": False,
@@ -204,3 +204,12 @@ DEFAULT_PAGE_SIZE = 50
 GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID", default=None)
 GOOGLE_CLIENT_SECRET = config("GOOGLE_CLIENT_SECRET", default=None)
 GOOGLE_REDIRECT_URI = config("GOOGLE_REDIRECT_URI", default="https://developers.google.com/oauthplayground")
+
+# Soul follow-up health thresholds (days)
+SOUL_FOLLOWUP_DUE_DAYS = config("SOUL_FOLLOWUP_DUE_DAYS", default=7, cast=int)
+SOUL_FOLLOWUP_OVERDUE_DAYS = config("SOUL_FOLLOWUP_OVERDUE_DAYS", default=14, cast=int)
+SOUL_FOLLOWUP_DORMANT_DAYS = config("SOUL_FOLLOWUP_DORMANT_DAYS", default=60, cast=int)
+
+# Anonymous testimony submission rate limiting
+ANON_SUBMISSION_RATE_LIMIT = config("ANON_SUBMISSION_RATE_LIMIT", default=5, cast=int)
+ANON_SUBMISSION_RATE_WINDOW_HOURS = config("ANON_SUBMISSION_RATE_WINDOW_HOURS", default=24, cast=int)

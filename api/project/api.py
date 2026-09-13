@@ -13,6 +13,7 @@ from testimonies.api import router as testimonies_router
 from sync.api import router as sync_router
 from personal_missions.api import router as personal_missions_router
 from notifications.api import router as notifications_router
+from base.utils.exceptions import NotFoundError, ForbiddenError
 
 
 api = NinjaAPI()
@@ -42,3 +43,13 @@ def validation_errors(request: HttpRequest, exc: Union[ValidationError, str]) ->
         response = {"detail": exc.errors}
 
     return api.create_response(request, response, status=400)
+
+
+@api.exception_handler(NotFoundError)
+def not_found_errors(request: HttpRequest, exc: NotFoundError) -> HttpResponse:
+    return api.create_response(request, {"detail": exc.message}, status=404)
+
+
+@api.exception_handler(ForbiddenError)
+def forbidden_errors(request: HttpRequest, exc: ForbiddenError) -> HttpResponse:
+    return api.create_response(request, {"detail": exc.message}, status=403)

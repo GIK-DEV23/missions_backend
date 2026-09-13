@@ -16,6 +16,13 @@ class ContactOutcome(TextChoices):
     NOT_YET = "not_yet", _("Not yet")
 
 
+class FollowUpHealth(TextChoices):
+    HEALTHY = "healthy", _("Healthy")
+    DUE = "due", _("Due")
+    OVERDUE = "overdue", _("Overdue")
+    DORMANT = "dormant", _("Dormant")
+
+
 class ProgressUpdateType(TextChoices):
     CALL = "call", _("Call")
     WHATSAPP = "whatsapp", _("WhatsApp")

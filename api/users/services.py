@@ -3,7 +3,7 @@ from typing import Optional, List
 from django.core.exceptions import ValidationError
 
 from authentication.permissions import has_role_type
-from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.exceptions import CustomValidationError, ForbiddenError, handle_cleaning_error
 from authentication import permissions_list
 from users.models import User, Role
 from users.schemas import UserType
@@ -223,4 +223,4 @@ def missioner_restriction_handler(user, kwargs):
 
     # Missioners can only access their own data
     if requested_user_id and requested_user_id != user.id:
-        raise CustomValidationError("You can only access your own details.")
+        raise ForbiddenError("You can only access your own details.")

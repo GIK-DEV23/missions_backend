@@ -16,7 +16,8 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.views.generic import RedirectView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -35,6 +36,7 @@ if settings.ALLOW_ADMIN_SITE:
 
 urlpatterns += [
     path("api/", api.urls),
+    re_path(r'^api/v1/(?P<path>.*)$', RedirectView.as_view(url='/api/%(path)s', query_string=True, permanent=False)),
     path("health/", health_check),
 ]
 

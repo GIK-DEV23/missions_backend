@@ -3,7 +3,7 @@ from typing import Optional
 
 from audit_logs.filters import AuditLogFilter
 from audit_logs.models import AuditLog
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import NotFoundError
 
 
 def audit_log_details(id: int) -> AuditLog:
@@ -22,7 +22,7 @@ def audit_log_details(id: int) -> AuditLog:
     try:
         return AuditLog.objects.get(id=id)
     except AuditLog.DoesNotExist:
-        raise CustomValidationError("AuditLog with the the id {} does not exist.".format(id))
+        raise NotFoundError("AuditLog with the the id {} does not exist.".format(id))
 
 
 def audit_logs_list(filters: Optional[dict] = None):

@@ -24,11 +24,13 @@ router = Router(
 )
 def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
     """API endpoint to list souls with optional filters and pagination."""
+    filters = params.dict(exclude={'follow_up_health', 'sort_by', 'is_desc', 'page', 'page_size'})
     souls = selectors.list_souls(
         user=request.user,
-        filters=params.dict(),
+        filters=filters,
         sort_by=params.sort_by,
-        is_desc=params.is_desc
+        is_desc=params.is_desc,
+        follow_up_health=params.follow_up_health
     )
     response = paginate_response(
         queryset=souls,
@@ -233,3 +235,69 @@ def soul_details_api(request, soul_id: int):
     """API endpoint to retrieve details of a specific soul by ID."""
     soul = selectors.get_soul(soul_id=soul_id)
     return schemas.SoulDetailsOut(**soul.to_dict_details(request))
+
+
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
+)
+@router.get(
+    "/{soul_id}/activity/",
+    response={200: List[schemas.ProgressUpdateOut]},
+    auth=jwt_auth
+)
+def soul_activity_api(request, soul_id: int, params: schemas.ProgressUpdateQuery = Query(...)):
+    """API endpoint to retrieve all progress updates for a specific soul."""
+    activity = selectors.get_soul_activity(soul_id=soul_id)
+    response = paginate_response(
+        queryset=activity,
+        request=request,
+        schema=schemas.ProgressUpdateOut,
+        page=params.page,
+        page_size=params.page_size
+    )
+    return JsonResponse(response, safe=False)
+
+
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
+)
+@router.get(
+    "/{soul_id}/assignments/",
+    response={200: List[schemas.SoulAssignmentOut]},
+    auth=jwt_auth
+)
+def soul_assignments_list_api(request, soul_id: int):
+    """List all assignments for a soul."""
+    assignments = selectors.list_soul_assignments(soul_id=soul_id)
+    return [schemas.SoulAssignmentOut(**a.to_dict(request)) for a in assignments]
+
+
+@require_permission("assign_soul")
+@router.post(
+    "/{soul_id}/assignments/",
+    response={201: schemas.SoulAssignmentOut},
+    auth=jwt_auth
+)
+def create_soul_assignment_api(request, soul_id: int, assignment_in: schemas.SoulAssignmentCreate):
+    """Assign a user to follow up with a soul."""
+    data = assignment_in.dict()
+    data["soul_id"] = soul_id
+    assignment = services.create_soul_assignment(user=request.user, data=data)
+    return 201, schemas.SoulAssignmentOut(**assignment.to_dict(request))
+
+
+@require_permission("assign_soul")
+@router.patch(
+    "/assignments/{assignment_id}/",
+    response={200: schemas.SoulAssignmentOut},
+    auth=jwt_auth
+)
+def update_soul_assignment_api(request, assignment_id: int, assignment_in: schemas.SoulAssignmentUpdate):
+    """Update an assignment (e.g., deactivate or add notes)."""
+    data = {k: v for k, v in assignment_in.dict().items() if v is not None}
+    assignment = services.update_soul_assignment(assignment_id=assignment_id, data=data)
+    return schemas.SoulAssignmentOut(**assignment.to_dict(request))

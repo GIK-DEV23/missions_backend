@@ -208,3 +208,14 @@ def approve_testimony_api(request, testimony_id: int):
 def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSchema):
     testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/anonymous/",
+    response={201: schemas.TestimonyOutSchema, 400: DetailOut, 429: DetailOut},
+)
+def create_anonymous_testimony_api(request, testimony_in: schemas.AnonymousTestimonyCreate):
+    """Submit a testimony anonymously. Rate limited by device token."""
+    data = testimony_in.dict()
+    testimony = services.create_anonymous_testimony(data)
+    return 201, schemas.TestimonyOutSchema(**testimony.to_dict(request))

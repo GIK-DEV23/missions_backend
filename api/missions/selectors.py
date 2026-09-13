@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any
 
 from django.db import models
 
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, NotFoundError
 from base.utils.helpers import apply_sorting
 from django.db.models import Count, Q
 from missions.constants import EventType
@@ -25,7 +25,7 @@ def location_details(location_id: int) -> Location:
     try:
         return Location.objects.get(id=location_id)
     except Location.DoesNotExist:
-        raise CustomValidationError("Location with the given ID does not exist.")
+        raise NotFoundError("Location with the given ID does not exist.")
 
 
 def locations_list(filters: Optional[Dict[str, Any]] = None) -> models.QuerySet:
@@ -55,7 +55,7 @@ def mission_category_details(category_id: int) -> Optional[MissionCategory]:
     try:
         return MissionCategory.objects.get(id=category_id)
     except MissionCategory.DoesNotExist:
-        raise CustomValidationError("MissionCategory with the given ID does not exist.")
+        raise NotFoundError("MissionCategory with the given ID does not exist.")
 
 
 def mission_categories_list(search: Optional[str] = None, event_type: Optional[EventType] = None) -> models.QuerySet:
@@ -250,7 +250,7 @@ def gallery_image_details(image_id: int) -> MissionGallery:
     try:
         return MissionGallery.objects.get(id=image_id)
     except MissionGallery.DoesNotExist:
-        raise CustomValidationError("MissionGallery with the given ID does not exist.")
+        raise NotFoundError("MissionGallery with the given ID does not exist.")
 
 
 def gallery_images_list(

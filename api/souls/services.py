@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
-from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.exceptions import CustomValidationError, ForbiddenError, handle_cleaning_error
 from base.utils.file_parser import FileParser
 from base.utils.helpers import validate_date, resolve_fk_by_client_id
 from missions.selectors import location_details, mission_details
@@ -327,7 +327,7 @@ def progress_update_handler(user, kwargs):
     else:
         return None
     if not soul.user or soul.user.pk != user.pk:
-        raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
+        raise ForbiddenError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None
 
 
@@ -344,4 +344,43 @@ def missioner_soul_operations_handler(user, kwargs):
     soul = get_soul(soul_id=soul_id)
 
     if not soul.user or soul.user.pk != user.id:
-        raise CustomValidationError("You can only view/update souls assigned to you.")
+        raise ForbiddenError("You can only view/update souls assigned to you.")
+
+
+def create_soul_assignment(user, data: dict):
+    from souls.models import SoulAssignment
+    from souls.selectors import get_soul
+    
+    soul = get_soul(data["soul_id"])
+    assignee = user_details(data["user_id"])
+    
+    try:
+        assignment = SoulAssignment(
+            soul=soul,
+            user=assignee,
+            assigned_by=user,
+            notes=data.get("notes", "")
+        )
+        assignment.full_clean()
+        assignment.save()
+    except ValidationError as e:
+        error_message = handle_cleaning_error(e)
+        raise CustomValidationError(error_message)
+    return assignment
+
+
+def update_soul_assignment(assignment_id: int, data: dict):
+    from souls.selectors import get_soul_assignment
+    
+    assignment = get_soul_assignment(assignment_id)
+    
+    try:
+        for key, value in data.items():
+            if value is not None:
+                setattr(assignment, key, value)
+        assignment.full_clean()
+        assignment.save()
+    except ValidationError as e:
+        error_message = handle_cleaning_error(e)
+        raise CustomValidationError(error_message)
+    return assignment

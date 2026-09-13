@@ -49,6 +49,7 @@ class Soul(BaseModel):
         return self.get_full_name()
 
     def to_dict(self, request: Optional[HttpRequest] = None):
+        from souls.selectors import compute_follow_up_health
         data = super().to_dict()
         data.update({
             "location_id": self.location.id if self.location else None,
@@ -59,7 +60,8 @@ class Soul(BaseModel):
             "possible_duplicate_of": self.possible_duplicate_of_id,
             "user_id": self.user.id if self.user else None,
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
-            "soul_full_name": self.get_full_name()
+            "soul_full_name": self.get_full_name(),
+            "follow_up_health": compute_follow_up_health(self),
         })
         return data
 
@@ -106,5 +108,37 @@ class ProgressUpdate(BaseModel):
             "soul_full_name": self.soul.get_full_name() if self.soul else None,
             "author_id": self.author.id if self.author else None,
             "author_full_name": str(self.author.get_full_name()) if self.author else None,
+        })
+        return data
+
+
+class SoulAssignment(BaseModel):
+    soul = models.ForeignKey(Soul, on_delete=models.CASCADE, related_name='assignments')
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name='soul_assignments')
+    assigned_by = models.ForeignKey("users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name='assigned_souls')
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        db_table = "soul_assignments"
+        indexes = [
+            models.Index(fields=['soul', 'is_active']),
+            models.Index(fields=['user', 'is_active']),
+        ]
+
+    def __str__(self):
+        return "{} assigned to {}".format(self.soul.get_full_name(), self.user.get_full_name())
+
+    def to_dict(self, request: Optional[HttpRequest] = None):
+        data = super().to_dict()
+        data.update({
+            "soul_id": self.soul_id,
+            "soul_full_name": self.soul.get_full_name(),
+            "user_id": self.user_id,
+            "user_full_name": str(self.user.get_full_name()),
+            "assigned_by_id": self.assigned_by_id,
+            "assigned_by_full_name": str(self.assigned_by.get_full_name()) if self.assigned_by else None,
+            "is_active": self.is_active,
+            "notes": self.notes,
         })
         return data
