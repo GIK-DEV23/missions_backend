@@ -342,6 +342,22 @@ def delete_mission_participant_api(request, participant_id: int):
     return 204, "Participant deleted successfully"
 
 
+@router.post(
+    "/participants/{participant_id}/cancel/",
+    response={200: DetailOut, 400: DetailOut},
+    auth=jwt_auth
+)
+def cancel_own_registration_api(request, participant_id: int):
+    """
+    Self-service: Cancel your own mission registration.
+    
+    Users can only cancel their own registrations. The mission must still
+    allow cancellations (before the cancellation deadline).
+    """
+    services.cancel_own_registration(user=request.user, participant_id=participant_id)
+    return 200, DetailOut(detail="Registration cancelled successfully")
+
+
 @router.get(
     "/reports/",
     response={200: List[schemas.ReportOutSchema], 400: DetailOut},

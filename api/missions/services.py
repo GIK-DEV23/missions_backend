@@ -539,6 +539,47 @@ def delete_mission_participant(user, participant_id: int) -> MissionJIAParticipa
     return participant
 
 
+def cancel_own_registration(user, participant_id: int) -> None:
+    """
+    Self-service: Cancel your own mission registration.
+    
+    Users can only cancel their own registrations.
+    
+    Args:
+        user: The authenticated user requesting cancellation.
+        participant_id: ID of the registration to cancel.
+    
+    Raises:
+        ForbiddenError: If the user is not the owner of the registration.
+        CustomValidationError: If cancellation is not allowed.
+    """
+    from base.utils.exceptions import ForbiddenError
+    from django.utils import timezone
+    
+    participant = mission_participant_details(participant_id)
+    
+    if participant.user_id != user.id:
+        raise ForbiddenError("You can only cancel your own registration.")
+    
+    if participant.is_archived:
+        raise CustomValidationError("This registration has already been cancelled.")
+    
+    mission = participant.mission
+    if mission.start_date and mission.start_date <= timezone.now().date():
+        raise CustomValidationError("Cannot cancel registration after the mission has started.")
+    
+    participant.is_archived = True
+    participant.save()
+    
+    log_audit_event(
+        user=user,
+        action_category="missions",
+        action_type=ActionType.DELETION,
+        action_description=f"User cancelled own registration for mission '{mission.pk}:{mission.title}'",
+        is_successful=True
+    )
+
+
 def bulk_create_mission_participants(participants_data: List[Dict[str, Any]]) -> List[MissionJIAParticipant]:
     """
     Bulk create mission participants.

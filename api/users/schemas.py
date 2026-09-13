@@ -113,3 +113,7 @@ class UserProfileUpdate(Schema):
     emergency_contact_name: Optional[str] = None
     emergency_contact_phone: Optional[str] = None
     saved_partner: Optional[SavedPartner] = None
+
+
+class EmailExistsOut(Schema):
+    exists: bool

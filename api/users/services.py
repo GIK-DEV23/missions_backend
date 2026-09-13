@@ -246,6 +246,44 @@ def missioner_restriction_handler(user, kwargs):
     print("user in restriction handler:", user)
     requested_user_id = kwargs.get('user_id')
 
-    # Missioners can only access their own data
     if requested_user_id and requested_user_id != user.id:
         raise ForbiddenError("You can only access your own details.")
+
+
+def delete_own_account(user: User) -> None:
+    """
+    Soft-delete/anonymize a user's account for GDPR compliance.
+    
+    - Anonymizes personal data (name, email, phone, bio, photo)
+    - Keeps the record for audit trail with anonymized data
+    - Deactivates the account
+    - Invalidates all refresh tokens
+    """
+    from authentication.models import RefreshToken
+    
+    with transaction.atomic():
+        RefreshToken.objects.filter(user=user).delete()
+        
+        user.email = f"deleted_{user.id}@deleted.local"
+        user.username = f"deleted_{user.id}"
+        user.first_name = "Deleted"
+        user.last_name = "User"
+        user.preferred_username = None
+        user.phone_number = None
+        user.bio = None
+        user.church = None
+        user.profile_photo = None
+        user.gender = None
+        user.travelling_from = None
+        user.diet_advisory = None
+        user.emergency_contact_name = None
+        user.emergency_contact_phone = None
+        user.saved_partner = None
+        user.is_active = False
+        user.set_unusable_password()
+        user.save()
+
+
+def check_email_exists(email: str) -> bool:
+    """Check if an email address is already registered."""
+    return User.objects.filter(email__iexact=email.strip()).exists()

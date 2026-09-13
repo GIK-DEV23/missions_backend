@@ -171,3 +171,34 @@ def get_user_api(request, user_id: int):
 def get_role_api(request, role_id: int):
     role = selectors.role_details(role_id=role_id)
     return schemas.RoleOut(**role.to_dict())
+
+
+@router.delete(
+    "/me/",
+    response={200: DetailOut},
+    auth=jwt_auth
+)
+def delete_own_account_api(request):
+    """
+    Permanently delete the caller's own account.
+    
+    This anonymizes all personal data and deactivates the account.
+    The action cannot be undone.
+    """
+    services.delete_own_account(request.user)
+    return 200, DetailOut(detail="Account deleted successfully")
+
+
+@router.get(
+    "/check-email/",
+    response={200: schemas.EmailExistsOut}
+)
+def check_email_exists_api(request, email: str = Query(...)):
+    """
+    Check if an email address is already registered.
+    
+    This endpoint is public (no auth required) to allow checking
+    during the signup flow before credentials are submitted.
+    """
+    exists = services.check_email_exists(email)
+    return schemas.EmailExistsOut(exists=exists)
