@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from authentication.api import router as auth_router
 from audit_logs.api import router as audit_logs_router
 from users.api import router as users_router
+from users.registration_defaults_api import router as registration_defaults_router
 from missions.api import router as missions_router
 from souls.api import router as souls_router
 from testimonies.api import router as testimonies_router
@@ -26,6 +27,7 @@ def health_check(request: HttpRequest):
 api.add_router("audit_logs/", audit_logs_router)
 api.add_router("/auth/", auth_router)
 api.add_router("/users/", users_router)
+api.add_router("/users/", registration_defaults_router)
 api.add_router("/missions/", missions_router)
 api.add_router("/souls/", souls_router)
 api.add_router("/testimonies/", testimonies_router)

@@ -9,7 +9,7 @@ from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel
-from users.constants import AuthProviderType
+from users.constants import AuthProviderType, GenderType
 from users.managers import UserManager
 
 
@@ -149,6 +149,9 @@ class User(AbstractUser, BaseModel):
     roles = models.ManyToManyField(Role, related_name='users', blank=True)
     church = models.CharField(max_length=200, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GenderType.choices, null=True, blank=True)
+    travelling_from = models.CharField(max_length=200, null=True, blank=True)
+    diet_advisory = models.TextField(null=True, blank=True)
     emergency_contact_name = models.CharField(max_length=100, null=True, blank=True)
     emergency_contact_phone = PhoneNumberField(null=True, blank=True)
     emergency_contact_confirmed_at = models.DateTimeField(null=True, blank=True)

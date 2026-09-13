@@ -213,6 +213,31 @@ def update_own_profile(user: User, data: dict) -> User:
     return user
 
 
+def update_registration_defaults(user: User, data: dict) -> User:
+    if "full_name" in data:
+        full_name = data.pop("full_name") or ""
+        parts = full_name.strip().split(" ", 1)
+        user.first_name = parts[0]
+        user.last_name = parts[1] if len(parts) > 1 else ""
+
+    if "saved_partner" in data and data["saved_partner"] is not None:
+        partner = data["saved_partner"]
+        if hasattr(partner, "dict"):
+            partner = partner.dict()
+        data["saved_partner"] = partner
+
+    try:
+        for key, value in data.items():
+            setattr(user, key, value)
+        user.full_clean()
+        user.save()
+    except ValidationError as e:
+        raise CustomValidationError(handle_cleaning_error(e))
+    except Exception as e:
+        raise CustomValidationError("Error updating registration defaults: {}".format(e))
+    return user
+
+
 def missioner_restriction_handler(user, kwargs):
     """
     Restriction handler for missioner role.
