@@ -259,6 +259,7 @@ class User(AbstractUser, BaseModel):
         data = super().to_dict()
         data.update({
             "id": self.pk,
+            "preferred_username": self.preferred_username,
             "display_name": self.get_display_name(),
             "roles": list(self.roles.values_list('name', flat=True)),
             "date_joined": self.date_joined.isoformat() if self.date_joined else None,

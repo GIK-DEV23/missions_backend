@@ -94,6 +94,7 @@ class UserProfileOut(BaseOut):
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    preferred_username: Optional[str] = None
     display_name: str
     phone_number: Optional[str] = None
     church: Optional[str] = None
@@ -107,6 +108,7 @@ class UserProfileOut(BaseOut):
 
 
 class UserProfileUpdate(Schema):
+    preferred_username: Optional[str] = None
     phone_number: Optional[str] = None
     church: Optional[str] = None
     bio: Optional[str] = None
