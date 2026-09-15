@@ -29,6 +29,12 @@ class PersonalMission(BaseModel):
 
     class Meta:
         db_table = "personal_missions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "client_id"],
+                name="uniq_personal_mission_owner_client",
+            ),
+        ]
 
     def __str__(self):
         return self.name
