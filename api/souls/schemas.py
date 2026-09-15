@@ -44,10 +44,13 @@ class SoulsQuery(BaseQuery):
 
 
 class SoulCreate(Schema):
-    """Schema for creating a soul."""
+    """Schema for creating a soul.
+
+    Accepts a single ``full_name`` (split server-side into first/last name),
+    matching the mobile app's single name field.
+    """
     client_id: Optional[uuid.UUID] = None
-    first_name: str
-    last_name: str
+    full_name: str
     phone_number: str
     gender: GenderType
     age_group: AgeGroupCategory
@@ -57,6 +60,7 @@ class SoulCreate(Schema):
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     personal_mission: Optional[int] = None
+    personal_mission_client_id: Optional[uuid.UUID] = None
     is_personal: bool = False
     user: Optional[int] = None
     description: Optional[str] = None
@@ -79,6 +83,7 @@ class SoulUpdate(Schema):
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     personal_mission: Optional[int] = None
+    personal_mission_client_id: Optional[uuid.UUID] = None
     is_personal: bool = False
     user: Optional[int] = None
     description: Optional[str] = None
