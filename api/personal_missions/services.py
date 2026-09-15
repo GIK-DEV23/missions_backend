@@ -14,6 +14,14 @@ def _validate_what_happened(type_value, what_happened):
 
 def create_personal_mission(owner, data: dict) -> PersonalMission:
     _validate_what_happened(data.get("type"), data.get("what_happened"))
+    # Idempotent by (owner, client_id): if the same client creates this record
+    # twice (e.g. retry after a network drop mid-response), return the existing
+    # row rather than creating a duplicate.
+    client_id = data.get("client_id")
+    if client_id is not None:
+        existing = PersonalMission.objects.filter(owner=owner, client_id=client_id).first()
+        if existing is not None:
+            return existing
     try:
         personal_mission = PersonalMission(owner=owner, **data)
         personal_mission.full_clean()
