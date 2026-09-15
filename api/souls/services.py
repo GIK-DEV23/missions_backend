@@ -10,14 +10,17 @@ from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import Http404
 from django.utils import timezone
+from ninja.errors import HttpError
 
 from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
 from base.utils.exceptions import CustomValidationError, ForbiddenError, handle_cleaning_error
 from base.utils.file_parser import FileParser
-from base.utils.helpers import validate_date, resolve_fk_by_client_id
+from base.utils.helpers import validate_date, resolve_fk_by_client_id, normalize_kenyan_phone
 from missions.selectors import location_details, mission_details
+from personal_missions.models import PersonalMission
 from personal_missions.selectors import personal_mission_details
 from souls.models import Soul, ProgressUpdate
 from souls.selectors import get_soul, get_soul_by_client_id
@@ -31,6 +34,48 @@ FK_RESOLVERS = {
     "personal_mission": personal_mission_details,
     "user": user_details,
 }
+
+
+def _resolve_personal_mission(user, data: dict):
+    """Resolve `personal_mission` FK from either an int id or a client UUID.
+
+    Pops `personal_mission_client_id` from *data* (never stored on the model
+    directly).  Rules:
+    - `personal_mission` (int) present → use directly, skip UUID lookup.
+    - `personal_mission_client_id` (UUID) present, no int → look up by
+      (owner, client_id).  Found → set `personal_mission`; not found → 409
+      so the client retries after the mission syncs.
+    - Neither present → no-op.
+    """
+    client_id = data.pop("personal_mission_client_id", None)
+
+    # If the int FK is already present, it wins; UUID is only a fallback.
+    if data.get("personal_mission") is not None:
+        if client_id is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Soul create/update: both personal_mission (int) and "
+                "personal_mission_client_id supplied; using int."
+            )
+        return  # FK_RESOLVERS will handle the int lookup as usual
+
+    if client_id is None:
+        return  # no mission link requested
+
+    try:
+        pm = PersonalMission.objects.get(client_id=client_id, owner=user)
+        data["personal_mission"] = pm.id
+    except PersonalMission.DoesNotExist:
+        raise HttpError(
+            409,
+            {
+                "code": "MISSION_NOT_SYNCED",
+                "detail": (
+                    "Personal mission with client_id={} not found on server yet. "
+                    "Sync the mission first, then retry."
+                ).format(client_id),
+            },
+        )
 
 
 def _find_possible_duplicate(phone_number, exclude_id=None) -> Optional[int]:
@@ -48,8 +93,35 @@ def _stamp_consent_and_contact_fields(data: dict, existing_consent_recorded_at=N
         data["do_not_contact_at"] = timezone.now()
 
 
-def create_soul(data) -> Soul:
+def _split_full_name(full_name: str) -> tuple[str, str]:
+    """Split a single full name into (first_name, last_name).
+
+    The first whitespace-separated token is the first name; the remainder is
+    the last name. A single-word name is allowed — the last name is left blank.
+    Only a completely empty name is rejected.
+    """
+    parts = (full_name or "").strip().split()
+    if not parts:
+        raise CustomValidationError("full_name: Please enter a name.")
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def create_soul(user, data) -> Soul:
     try:
+        # Accept a single full_name and split it into the model's first/last.
+        if "full_name" in data:
+            first_name, last_name = _split_full_name(data.pop("full_name"))
+            data["first_name"] = first_name
+            data["last_name"] = last_name
+        # Normalize the phone to canonical E.164 (+254…), accepting the common
+        # local formats (07…, 01…, 254…, +254…).
+        if data.get("phone_number"):
+            data["phone_number"] = normalize_kenyan_phone(data["phone_number"])
+        # Resolve personal_mission_client_id → personal_mission int FK before
+        # the generic FK_RESOLVERS loop runs (which expects ints).
+        _resolve_personal_mission(user, data)
         for key, resolver in FK_RESOLVERS.items():
             if data.get(key) is not None:
                 data[key] = resolver(data[key])
@@ -59,9 +131,13 @@ def create_soul(data) -> Soul:
         soul = Soul(**data)
         soul.full_clean()
         soul.save()
+    except HttpError:
+        raise
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
+    except CustomValidationError:
+        raise
     except Exception as e:
         raise CustomValidationError("Error creating soul: {}".format(e))
     return soul
@@ -76,6 +152,9 @@ def update_soul(user, soul_id, data) -> Soul:
         _stamp_consent_and_contact_fields(data, soul.consent_recorded_at, soul.do_not_contact_at)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"], exclude_id=soul.id)
+        # Resolve personal_mission_client_id → personal_mission int FK before
+        # the generic FK_RESOLVERS loop runs.
+        _resolve_personal_mission(user, data)
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:
@@ -95,6 +174,8 @@ def update_soul(user, soul_id, data) -> Soul:
                 action_description=log_message,
                 is_successful=True
             )
+    except HttpError:
+        raise
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)

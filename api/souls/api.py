@@ -65,7 +65,7 @@ def souls_stats_api(request, params: schemas.SoulsQuery = Query(...)):
 )
 def create_soul_api(request, soul_in: schemas.SoulCreate):
     """API endpoint to create a new soul."""
-    soul = services.create_soul(soul_in.dict())
+    soul = services.create_soul(user=request.user, data=soul_in.dict())
     return 201, schemas.SoulOut(**soul.to_dict(request))
 
 
