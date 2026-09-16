@@ -12,7 +12,7 @@ from users.constants import GenderType, AgeGroupCategory
 class Soul(BaseModel):
     client_id = client_id_field()
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, default="")
     phone_number = PhoneNumberField()
     location = models.ForeignKey("missions.Location", on_delete=models.SET_NULL, null=True, blank=True, related_name='souls')
     status = models.CharField(max_length=50, choices=JourneyStage.choices, default=JourneyStage.NEW_BELIEVER)
@@ -43,7 +43,7 @@ class Soul(BaseModel):
         unique_together = ('first_name', 'last_name', 'phone_number', 'user', 'mission')
 
     def get_full_name(self):
-        return "{} {}".format(self.first_name, self.last_name)
+        return "{} {}".format(self.first_name, self.last_name).strip()
 
     def __str__(self):
         return self.get_full_name()

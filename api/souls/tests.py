@@ -339,3 +339,75 @@ class ConsentDuplicateAndMergeTests(TestCase):
         soul = services.create_soul(self._soul_data())
         with self.assertRaises(CustomValidationError):
             services.merge_souls(self.user, soul.id, soul.id)
+
+
+class FullNameAndPhoneTests(TestCase):
+    """Option A: create accepts a single full_name (split into first/last) and
+    normalizes the phone to canonical Kenyan E.164."""
+
+    def _data(self, **overrides):
+        data = {
+            "full_name": "Jane Doe",
+            "phone_number": "0712345678",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        }
+        data.update(overrides)
+        return data
+
+    def test_full_name_split_into_first_and_last(self):
+        soul = services.create_soul(self._data(full_name="Jane Mary Doe"))
+        self.assertEqual(soul.first_name, "Jane")
+        self.assertEqual(soul.last_name, "Mary Doe")
+
+    def test_single_word_full_name_allowed_with_blank_last_name(self):
+        soul = services.create_soul(self._data(full_name="Jane"))
+        self.assertEqual(soul.first_name, "Jane")
+        self.assertEqual(soul.last_name, "")
+        self.assertEqual(soul.get_full_name(), "Jane")
+
+    def test_blank_full_name_rejected(self):
+        with self.assertRaises(CustomValidationError):
+            services.create_soul(self._data(full_name="   "))
+
+    def test_phone_normalized_from_local_zero_format(self):
+        soul = services.create_soul(self._data(phone_number="0712345678"))
+        self.assertEqual(str(soul.phone_number), "+254712345678")
+
+    def test_phone_normalized_from_bare_subscriber(self):
+        soul = services.create_soul(
+            self._data(full_name="A B", phone_number="712345670")
+        )
+        self.assertEqual(str(soul.phone_number), "+254712345670")
+
+    def test_phone_normalized_from_spaced_input(self):
+        soul = services.create_soul(
+            self._data(full_name="A C", phone_number="+254 712 345 671")
+        )
+        self.assertEqual(str(soul.phone_number), "+254712345671")
+
+    def test_phone_accepts_01_prefix(self):
+        soul = services.create_soul(
+            self._data(full_name="A D", phone_number="0112345672")
+        )
+        self.assertEqual(str(soul.phone_number), "+254112345672")
+
+    def test_invalid_phone_rejected(self):
+        with self.assertRaises(CustomValidationError):
+            services.create_soul(self._data(phone_number="6786564654645"))
+
+    def test_backward_compatible_first_last_name(self):
+        # Internal callers that still pass first_name/last_name keep working.
+        soul = services.create_soul({
+            "first_name": "Legacy",
+            "last_name": "Caller",
+            "phone_number": "0712345699",
+            "gender": GenderType.MALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        })
+        self.assertEqual(soul.first_name, "Legacy")
+        self.assertEqual(str(soul.phone_number), "+254712345699")

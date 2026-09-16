@@ -128,9 +128,17 @@ def create_soul(user, data) -> Soul:
         _stamp_consent_and_contact_fields(data)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"])
-        soul = Soul(**data)
-        soul.full_clean()
-        soul.save()
+        
+        with transaction.atomic():
+            soul = Soul(**data)
+            soul.full_clean()
+            soul.save()
+            
+            # Mark rhythm period as met if soul is linked to a personal mission
+            if soul.personal_mission:
+                from personal_missions.services import mark_period_met
+                mark_period_met(soul.personal_mission, soul.date_added)
+                
     except HttpError:
         raise
     except ValidationError as e:
@@ -241,15 +249,22 @@ def create_progress_update(data: dict) -> ProgressUpdate:
         data["author"] = user_details(author_id)
     next_check_in_at = data.get("next_check_in_at")
     try:
-        progress_update = ProgressUpdate(soul=soul, **data)
-        progress_update.full_clean()
-        progress_update.save()
-        soul_update_fields = ["last_contacted_at"]
-        soul.last_contacted_at = progress_update.created_at
-        if next_check_in_at:
-            soul.next_check_in_at = next_check_in_at
-            soul_update_fields.append("next_check_in_at")
-        soul.save(update_fields=soul_update_fields)
+        with transaction.atomic():
+            progress_update = ProgressUpdate(soul=soul, **data)
+            progress_update.full_clean()
+            progress_update.save()
+            soul_update_fields = ["last_contacted_at"]
+            soul.last_contacted_at = progress_update.created_at
+            if next_check_in_at:
+                soul.next_check_in_at = next_check_in_at
+                soul_update_fields.append("next_check_in_at")
+            soul.save(update_fields=soul_update_fields)
+            
+            # Mark rhythm period as met if soul belongs to a personal mission
+            if soul.personal_mission:
+                from personal_missions.services import mark_period_met
+                mark_period_met(soul.personal_mission, progress_update.update_date)
+                
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
