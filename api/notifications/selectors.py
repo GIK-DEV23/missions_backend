@@ -10,4 +10,4 @@ def get_notification(user, notification_id: int) -> Notification:
 
 
 def list_notifications(user):
-    return Notification.objects.filter(user=user)
+    return Notification.objects.filter(user=user).order_by('-created_at')

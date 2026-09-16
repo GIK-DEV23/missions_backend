@@ -42,7 +42,7 @@ def validation_errors(request: HttpRequest, exc: Union[ValidationError, str]) ->
     if isinstance(exc, str):
         response = {"detail": exc}
     else:
-        response = {"detail": exc.errors}
+        response = {"detail": exc.errors()}
 
     return api.create_response(request, response, status=400)
 

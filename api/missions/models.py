@@ -137,7 +137,8 @@ class Mission(BaseModel):
             "is_registration_open": self.is_registration_open,
             "total_souls_won": commas(self.total_souls_won, use_decimal=False),
             "total_souls_follow_up": commas(self.total_souls_follow_up, use_decimal=False),
-            "banner_image": request.build_absolute_uri(self.banner_image.url) if request and self.banner_image else None
+            "banner_image": request.build_absolute_uri(self.banner_image.url) if request and self.banner_image else None,
+            "participants_count": self.participants.filter(is_archived=False).count(),
         })
         return data
 
