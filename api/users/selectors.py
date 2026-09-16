@@ -162,3 +162,25 @@ def list_permissions(user_type: Optional[str] = None) -> list[str]:
     if not user_type:
         return list(permissions_list.ALL_PERMISSIONS)
     return list(role_map.get(user_type.lower(), []))
+
+
+def get_registration_defaults(user: User) -> dict:
+    """
+    Get the user's saved registration defaults for pre-filling mission sign-up forms.
+    Returns a dict with all fields (some may be None).
+    """
+    # Build full name from first and last name
+    full_name = ""
+    if user.first_name or user.last_name:
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    
+    return {
+        'full_name': full_name,
+        'phone_number': str(user.phone_number) if user.phone_number else None,
+        'gender': user.gender,
+        'travelling_from': user.travelling_from,
+        'diet_advisory': user.diet_advisory,
+        'emergency_contact_name': user.emergency_contact_name,
+        'emergency_contact_phone': str(user.emergency_contact_phone) if user.emergency_contact_phone else None,
+        'saved_partner': user.saved_partner,
+    }

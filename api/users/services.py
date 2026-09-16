@@ -214,6 +214,9 @@ def update_own_profile(user: User, data: dict) -> User:
 
 
 def update_registration_defaults(user: User, data: dict) -> User:
+    """
+    Update the user's registration defaults.
+    """
     if "full_name" in data:
         full_name = data.pop("full_name") or ""
         parts = full_name.strip().split(" ", 1)
@@ -235,6 +238,7 @@ def update_registration_defaults(user: User, data: dict) -> User:
         raise CustomValidationError(handle_cleaning_error(e))
     except Exception as e:
         raise CustomValidationError("Error updating registration defaults: {}".format(e))
+    
     return user
 
 

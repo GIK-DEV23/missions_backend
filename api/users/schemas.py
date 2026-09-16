@@ -119,3 +119,40 @@ class UserProfileUpdate(Schema):
 
 class EmailExistsOut(Schema):
     exists: bool
+
+
+# Registration Defaults schemas
+class RegistrationSavedPartnerIn(Schema):
+    name: str
+    gender: Optional[str] = None
+    travelling_from: Optional[str] = None
+    diet_advisory: Optional[str] = None
+
+
+class RegistrationSavedPartnerOut(Schema):
+    name: str
+    gender: Optional[str] = None
+    travelling_from: Optional[str] = None
+    diet_advisory: Optional[str] = None
+
+
+class RegistrationDefaultsOut(Schema):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    gender: Optional[str] = None
+    travelling_from: Optional[str] = None
+    diet_advisory: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    saved_partner: Optional[RegistrationSavedPartnerOut] = None
+
+
+class RegistrationDefaultsUpdate(Schema):
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    gender: Optional[str] = None
+    travelling_from: Optional[str] = None
+    diet_advisory: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    saved_partner: Optional[RegistrationSavedPartnerIn] = None
