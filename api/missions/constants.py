@@ -12,6 +12,7 @@ class LocationCategoryType(TextChoices):
 class MissionStatusType(TextChoices):
     """Mission status choices"""
     PLANNING = "planning", _("Planning")
+    REGISTERING = "registering", _("Registering")
     ACTIVE = "active", _("Active")
     COMPLETED = "completed", _("Completed")
     ON_HOLD = "on_hold", _("On Hold")

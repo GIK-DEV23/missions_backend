@@ -11,6 +11,7 @@ from base.schemas import BaseQuery, FilterQuery, BaseOut
 
 class MissionStatus(str, Enum):
     PLANNING = "planning"
+    REGISTERING = "registering"
     ACTIVE = "active"
     COMPLETED = "completed"
     ON_HOLD = "on_hold"
@@ -202,6 +203,7 @@ class MissionOutSchema(MinimalMissionOutSchema):
     location_id: int | None = None
     total_souls_followup: str | None = None
     banner_image: str | None = None
+    participants_count: int = 0
 
 
 class AttendanceDay(Schema):
