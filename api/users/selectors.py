@@ -63,7 +63,34 @@ def get_user_stats(user: User, time_filter: TimeFilter = TimeFilter.LIFETIME) ->
 
     in_follow_up = user_souls.exclude(contact_outcome=ContactOutcome.BORN_AGAIN).count()
 
-    missions_count = user_souls.exclude(mission__isnull=True).values('mission').distinct().count()
+    # missionsCount definition (canonical):
+    #   GIK missions where user has a registration AND >= 1 attended day
+    #   + all personal missions (active + archived, never gated on souls)
+    #
+    # Rationale: participation/commitment stat, not outcome. A personal mission
+    # created yesterday is real commitment; excluding empty missions would make
+    # the count go DOWN as the user works. Archived = completed/ended, not erased.
+    # Upcoming GIK registrations excluded: registration is intent, not participation.
+    # days_of_attendance being non-empty is the attendance signal already in the schema.
+    #
+    # WARNING: the missions list screen must use the same logic or profile vs list
+    # will show different numbers (guaranteed bug report).
+    from missions.models import MissionJIAParticipant
+    from personal_missions.models import PersonalMission
+
+    gik_missions_count = MissionJIAParticipant.objects.filter(
+        user=user,
+        days_of_attendance__len__gt=0,
+    ).values('mission').distinct().count()
+
+    personal_missions_qs = PersonalMission.objects.filter(owner=user)
+    if time_start:
+        personal_missions_qs = personal_missions_qs.filter(created_at__gte=time_start)
+    if time_end:
+        personal_missions_qs = personal_missions_qs.filter(created_at__lt=time_end)
+    personal_missions_count = personal_missions_qs.count()
+
+    missions_count = gik_missions_count + personal_missions_count
 
     all_user_souls = Soul.objects.filter(user=user, deleted_at__isnull=True)
     souls_with_data_count = all_user_souls.count()
