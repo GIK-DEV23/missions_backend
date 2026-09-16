@@ -107,7 +107,9 @@ class Testimony(BaseModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Testimony by {self.soul} - {self.title}"
+        # Testimony is always by the user who submitted it
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Testimony by {author} - {self.title}"
 
     def to_dict(self, request: HttpRequest = None) -> Dict[str, Any]:
         data = super().to_dict()
@@ -182,7 +184,8 @@ class Miracle(BaseModel):
     third_party_consent = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Miracle by {self.soul} - {self.title}"
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Miracle by {author} - {self.title}"
 
     class Meta:
         verbose_name = "Miracle"
@@ -249,7 +252,8 @@ class Highlight(BaseModel):
     third_party_consent = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Highlight by {self.soul} - {self.title}"
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Highlight by {author} - {self.title}"
 
     class Meta:
         verbose_name = "Highlight"
