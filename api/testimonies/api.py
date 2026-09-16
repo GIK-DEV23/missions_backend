@@ -148,6 +148,21 @@ def reject_miracle_api(request, miracle_id: int, reject_in: schemas.RejectSchema
 
 
 @router.get(
+    "/featured/",
+    response={200: List[schemas.TestimonyOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+def featured_testimonies_list_api(request, limit: int = 5):
+    """
+    Get testimonies that have been selected by admins for featuring on the home screen.
+    These are public testimonies that have been approved and marked as selected.
+    No special permission required - featured testimonies are public content.
+    """
+    testimonies = selectors.featured_testimonies_list(limit=limit)
+    return 200, [schemas.TestimonyOutSchema(**t.to_dict(request)) for t in testimonies]
+
+
+@router.get(
     "/{testimony_id}/",
     response={200: schemas.TestimonyOutSchema, 400: DetailOut},
     auth=jwt_auth
