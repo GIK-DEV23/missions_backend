@@ -404,10 +404,12 @@ def create_mission_participant(
     if coming_as_couple and not partner_name:
         raise CustomValidationError("Partner name is required when coming as a couple.")
 
-    if need_facilitation and not facilitation_amount:
-        raise CustomValidationError("Facilitation amount is required.")
+    # For full support (iNeedSupport), facilitation_amount is 0 — that's valid.
+    # Only partial support requires the user to enter a non-zero amount.
+    if need_facilitation and facilitation_amount < 0:
+        raise CustomValidationError("Facilitation amount cannot be negative.")
 
-    if facilitation_amount and not need_facilitation:
+    if not need_facilitation and facilitation_amount > 0:
         raise CustomValidationError("Facilitation amount not needed")
 
     mission_fee = get_mission_registration_fee(mission, coming_as_couple)
@@ -433,6 +435,9 @@ def create_mission_participant(
         if day is None or not (1 <= day <= total_days):
             raise CustomValidationError(f"Day {day} is out of range (must be 1–{total_days}).")
 
+        # Calculate expected date from mission start
+        expected_date = mission_start + timedelta(days=day - 1)
+
         if day_date:
             # Normalize to date if datetime provided
             if hasattr(day_date, "date"):
@@ -441,12 +446,13 @@ def create_mission_participant(
             if not (mission_start <= day_date <= mission_end):
                 raise CustomValidationError(f"Day date {day_date} is out of range. The mission starts on {mission_start} and ends on {mission_end}.")
 
-            # Expected date from mission start
-            expected_date = mission_start + timedelta(days=day - 1)
             if day_date != expected_date:
                 raise CustomValidationError(
                     f"Day {day} mismatch: expected {expected_date}, got {day_date}"
                 )
+        else:
+            # Auto-populate day_date if not provided
+            day_info["day_date"] = expected_date.isoformat()
 
         # Check duplicates
         if days_of_attendance.count(day_info) > 1:
