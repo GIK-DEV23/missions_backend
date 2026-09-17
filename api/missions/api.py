@@ -359,6 +359,26 @@ def cancel_own_registration_api(request, participant_id: int):
 
 
 @router.get(
+    "/{mission_id}/my-registration/",
+    response={200: schemas.MissionParticipantOutSchema, 404: DetailOut},
+    auth=jwt_auth
+)
+def get_my_registration_api(request, mission_id: int):
+    """
+    Get the current user's registration for a specific mission.
+    
+    Returns the participant record if the user is registered, or 404 if not.
+    """
+    participant = selectors.get_user_registration_for_mission(
+        user_id=request.user.id,
+        mission_id=mission_id
+    )
+    if participant is None:
+        return 404, DetailOut(detail="Registration not found")
+    return 200, schemas.MissionParticipantOutSchema(**participant.to_dict(request))
+
+
+@router.get(
     "/reports/",
     response={200: List[schemas.ReportOutSchema], 400: DetailOut},
     auth=jwt_auth

@@ -277,3 +277,24 @@ def gallery_images_list(
         allowed_fields=['created_at', 'title']
     )
     return MissionGalleryFilter(filters, qs).qs if filters else qs
+
+
+def get_user_registration_for_mission(user_id: int, mission_id: int) -> Optional[MissionJIAParticipant]:
+    """
+    Get the current user's registration for a specific mission.
+
+    Args:
+        user_id: ID of the user.
+        mission_id: ID of the mission.
+
+    Returns:
+        MissionJIAParticipant instance or None if not found.
+    """
+    try:
+        return MissionJIAParticipant.objects.get(
+            user_id=user_id,
+            mission_id=mission_id,
+            is_archived=False
+        )
+    except MissionJIAParticipant.DoesNotExist:
+        return None
