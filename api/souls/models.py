@@ -57,6 +57,7 @@ class Soul(BaseModel):
             "mission_id": self.mission.id if self.mission else None,
             "mission_title": self.mission.title if self.mission else None,
             "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
+            "personal_mission_client_id": str(self.personal_mission.client_id) if self.personal_mission and self.personal_mission.client_id else None,
             "possible_duplicate_of": self.possible_duplicate_of_id,
             "user_id": self.user.id if self.user else None,
             "user_full_name": str(self.user.get_full_name()) if self.user else None,

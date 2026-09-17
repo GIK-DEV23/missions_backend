@@ -84,7 +84,7 @@ class SoulUpdate(Schema):
     mission: Optional[int] = None
     personal_mission: Optional[int] = None
     personal_mission_client_id: Optional[uuid.UUID] = None
-    is_personal: bool = False
+    is_personal: Optional[bool] = None
     user: Optional[int] = None
     description: Optional[str] = None
     consent_given: Optional[bool] = None
@@ -119,6 +119,7 @@ class SoulOut(BaseOut):
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
     personal_mission_id: Optional[int] = None
+    personal_mission_client_id: Optional[str] = None
     is_personal: bool = False
     user_id: Optional[int] = None
     user_full_name: Optional[str] = None

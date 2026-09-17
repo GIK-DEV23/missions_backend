@@ -110,6 +110,13 @@ def _split_full_name(full_name: str) -> tuple[str, str]:
 
 def create_soul(user, data) -> Soul:
     try:
+        # Idempotency: if a soul with this client_id already exists, return it.
+        client_id = data.get("client_id")
+        if client_id is not None:
+            existing = Soul.objects.filter(client_id=client_id, deleted_at__isnull=True).first()
+            if existing is not None:
+                return existing
+
         # Accept a single full_name and split it into the model's first/last.
         if "full_name" in data:
             first_name, last_name = _split_full_name(data.pop("full_name"))
