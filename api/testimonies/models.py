@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 
 from base.models import BaseModel, client_id_field
+from base.utils.image_validators import get_image_validators
 from testimonies.constants import SubmissionVisibility, ReviewStatus
 
 
@@ -91,6 +92,7 @@ class Testimony(BaseModel):
         null=True,
         blank=True,
         help_text="Optional photo associated with the testimony",
+        validators=get_image_validators(),
     )
     is_selected = models.BooleanField(
         default=False,
@@ -136,10 +138,11 @@ class Miracle(BaseModel):
         help_text="Content of the miracle",
     )
     photo = models.ImageField(
-        upload_to=get_testimonies_dir,
+        upload_to=get_miracles_dir,
         null=True,
         blank=True,
         help_text="Optional photo associated with the miracle",
+        validators=get_image_validators(),
     )
     soul = models.ForeignKey(
         "souls.Soul",
@@ -212,7 +215,13 @@ class Highlight(BaseModel):
     client_id = client_id_field()
     title = models.CharField(max_length=255, help_text="Title of the highlight")
     content = models.TextField(help_text="Content of the highlight")
-    photo = models.ImageField(upload_to=get_highlights_dir, null=True, blank=True, help_text="Optional photo associated with the highlight")
+    photo = models.ImageField(
+        upload_to=get_highlights_dir,
+        null=True,
+        blank=True,
+        help_text="Optional photo associated with the highlight",
+        validators=get_image_validators(),
+    )
     soul = models.ForeignKey(
         "souls.Soul",
         on_delete=models.CASCADE,

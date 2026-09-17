@@ -9,6 +9,7 @@ from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel
+from base.utils.image_validators import get_image_validators
 from users.constants import AuthProviderType, GenderType
 from users.managers import UserManager
 
@@ -145,7 +146,12 @@ class User(AbstractUser, BaseModel):
     )
 
     # Additional fields
-    profile_photo = models.ImageField(upload_to=get_user_photos_dir, null=True, blank=True)
+    profile_photo = models.ImageField(
+        upload_to=get_user_photos_dir,
+        null=True,
+        blank=True,
+        validators=get_image_validators(),
+    )
     roles = models.ManyToManyField(Role, related_name='users', blank=True)
     church = models.CharField(max_length=200, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
