@@ -46,7 +46,7 @@ def get_auth_for_user(user: User) -> Dict:
         'is_superuser': user.is_superuser,
         'is_staff': user.is_staff,
         'date_joined': user.date_joined.isoformat() if user.date_joined else None,
-        'phone_number': user.phone_number,
+        'phone_number': str(user.phone_number) if user.phone_number else None,
         'bio': user.bio,
         'church': user.church,
     }

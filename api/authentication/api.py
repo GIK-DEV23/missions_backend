@@ -55,11 +55,11 @@ def login(request, data: LoginRequest):
 
     Authenticates a user with email and password, returning tokens on success.
     """
-    email = data.email
+    email = data.email.lower().strip()
     password = data.password
 
-    # Authenticate using Django's built-in system
-    user = authenticate(email=email, password=password)
+    # Django's authenticate() uses 'username' kwarg even when USERNAME_FIELD='email'
+    user = authenticate(username=email, password=password)
 
     current_time = timezone.now()
     # Format current time as 'YYYY-MM-DD HH:MM:SS'
@@ -239,7 +239,7 @@ def verify_token(request):
             "is_staff": user.is_staff,
             "profile_photo": user.profile_photo.url if user.profile_photo else None,
             "date_joined": user.date_joined.isoformat() if user.date_joined else None,
-            "phone_number": user.phone_number,
+            "phone_number": str(user.phone_number) if user.phone_number else None,
             "bio": user.bio,
             "church": user.church,
             "auth_provider": getattr(
