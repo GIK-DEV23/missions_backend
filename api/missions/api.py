@@ -185,6 +185,24 @@ def mission_analytics_api(request, mission_id: int):
 
 
 @router.get(
+    "/my-registrations/",
+    response={200: List[schemas.MissionParticipantOutSchema]},
+    auth=jwt_auth,
+)
+def get_my_registrations_api(request):
+    """
+    Return all non-archived registrations for the current user across all missions.
+    Used by the app on startup to seed local isUserRegistered flags.
+    """
+    from missions.models import MissionJIAParticipant
+    participants = MissionJIAParticipant.objects.filter(
+        user_id=request.user.id,
+        is_archived=False,
+    ).select_related('mission').order_by('-created_at')
+    return 200, [schemas.MissionParticipantOutSchema(**p.to_dict(request)) for p in participants]
+
+
+@router.get(
     "/",
     response={200: List[schemas.MissionOutSchema], 400: DetailOut},
     auth=jwt_auth
@@ -356,6 +374,31 @@ def cancel_own_registration_api(request, participant_id: int):
     """
     services.cancel_own_registration(user=request.user, participant_id=participant_id)
     return 200, DetailOut(detail="Registration cancelled successfully")
+
+
+@router.patch(
+    "/participants/{participant_id}/update-own/",
+    response={200: schemas.MissionParticipantOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+def update_own_registration_api(
+        request,
+        participant_id: int,
+        participant_in: schemas.MissionParticipantUpdateSchema
+):
+    """
+    Self-service: Update your own mission registration.
+    
+    Users can only update their own registrations before the mission starts.
+    Updates are limited to personal details, attendance days, dietary requirements,
+    and logistics preferences.
+    """
+    participant = services.update_own_registration(
+        user=request.user,
+        participant_id=participant_id,
+        update_dict=participant_in.dict(exclude_unset=True)
+    )
+    return 200, schemas.MissionParticipantOutSchema(**participant.to_dict(request))
 
 
 @router.get(

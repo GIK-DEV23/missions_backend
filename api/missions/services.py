@@ -586,6 +586,117 @@ def cancel_own_registration(user, participant_id: int) -> None:
     )
 
 
+def update_own_registration(user, participant_id: int, update_dict: Dict[str, Any]) -> MissionJIAParticipant:
+    """
+    Self-service: Update your own mission registration.
+    
+    Users can only update their own registrations before the mission starts.
+    
+    Args:
+        user: The authenticated user requesting the update.
+        participant_id: ID of the registration to update.
+        update_dict: Dictionary of fields to update.
+    
+    Returns:
+        Updated MissionJIAParticipant instance.
+    
+    Raises:
+        ForbiddenError: If the user is not the owner of the registration.
+        CustomValidationError: If update is not allowed.
+    """
+    from base.utils.exceptions import ForbiddenError
+    from django.utils import timezone
+    
+    participant = mission_participant_details(participant_id)
+    
+    if participant.user_id != user.id:
+        raise ForbiddenError("You can only update your own registration.")
+    
+    if participant.is_archived:
+        raise CustomValidationError("Cannot update a cancelled registration.")
+    
+    mission = participant.mission
+    if mission.start_date and mission.start_date <= timezone.now().date():
+        raise CustomValidationError("Cannot update registration after the mission has started.")
+    
+    # Allowed fields for self-service update
+    allowed_fields = {
+        'full_name', 'phone_number', 'travelling_from', 'days_of_attendance',
+        'diet_advisory', 'need_facilitation', 'facilitation_amount', 'gender',
+        'coming_as_couple', 'partner_name', 'payment_timing'
+    }
+    
+    # Filter to only allowed fields
+    filtered_update = {k: v for k, v in update_dict.items() if k in allowed_fields}
+    
+    # Validate days_of_attendance if provided
+    if 'days_of_attendance' in filtered_update:
+        days_of_attendance = filtered_update['days_of_attendance']
+        mission_start = mission.start_date
+        mission_end = mission.end_date
+        total_days = (mission_end - mission_start).days + 1
+        
+        for day_info in days_of_attendance:
+            day = day_info.get("day")
+            day_date = day_info.get("day_date")
+
+            if day is None or not (1 <= day <= total_days):
+                raise CustomValidationError(f"Day {day} is out of range (must be 1–{total_days}).")
+
+            expected_date = mission_start + timedelta(days=day - 1)
+
+            if day_date:
+                if hasattr(day_date, "date"):
+                    day_date = day_date.date()
+
+                if not (mission_start <= day_date <= mission_end):
+                    raise CustomValidationError(f"Day date {day_date} is out of range.")
+
+                if day_date != expected_date:
+                    raise CustomValidationError(
+                        f"Day {day} mismatch: expected {expected_date}, got {day_date}"
+                    )
+            else:
+                day_info["day_date"] = expected_date.isoformat()
+        
+        filtered_update['days_of_attendance'] = serialize_types(
+            sorted(days_of_attendance, key=lambda x: x["day"])
+        )
+    
+    # Validate couple registration
+    if filtered_update.get('coming_as_couple') and not filtered_update.get('partner_name') and not participant.partner_name:
+        raise CustomValidationError("Partner name is required when coming as a couple.")
+    
+    original_fields = {
+        key: getattr(participant, key)
+        for key in filtered_update.keys()
+        if hasattr(participant, key)
+    }
+    
+    for key, value in filtered_update.items():
+        setattr(participant, key, value)
+    
+    changed_fields = []
+    for key, old_value in original_fields.items():
+        new_value = getattr(participant, key)
+        if old_value != new_value:
+            changed_fields.append(f"{key}: '{old_value}' → '{new_value}'")
+    
+    participant.save()
+    
+    if changed_fields:
+        changes_text = ", ".join(changed_fields)
+        log_audit_event(
+            user=user,
+            action_category="missions",
+            action_type=ActionType.MODIFICATION,
+            action_description=f"User updated own registration for mission '{mission.pk}:{mission.title}'. Changes: {changes_text}",
+            is_successful=True
+        )
+    
+    return participant
+
+
 def bulk_create_mission_participants(participants_data: List[Dict[str, Any]]) -> List[MissionJIAParticipant]:
     """
     Bulk create mission participants.
