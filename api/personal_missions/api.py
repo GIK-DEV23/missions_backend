@@ -17,9 +17,21 @@ router = Router(tags=["personal_missions"])
     auth=jwt_auth
 )
 def personal_missions_list_api(request):
-    """Owner-scoped list of the caller's own personal missions."""
-    personal_missions = selectors.list_personal_missions_with_rhythm(user=request.user)
+    """Owner-scoped list of the caller's own personal missions (excludes archived)."""
+    personal_missions = selectors.list_personal_missions_with_rhythm(user=request.user, include_archived=False)
     return personal_missions
+
+
+@require_permission("list_personal_missions")
+@router.get(
+    "/archived/",
+    response={200: List[schemas.PersonalMissionOut]},
+    auth=jwt_auth
+)
+def archived_personal_missions_list_api(request):
+    """Owner-scoped list of the caller's archived personal missions only."""
+    archived_missions = selectors.list_archived_personal_missions_with_rhythm(user=request.user)
+    return archived_missions
 
 
 @require_permission("create_personal_mission")

@@ -23,18 +23,43 @@ def list_personal_missions(user):
     return PersonalMission.objects.filter(owner=user).order_by('-updated_at', '-created_at')
 
 
-def list_personal_missions_with_rhythm(user) -> List[Dict[str, Any]]:
+def list_personal_missions_with_rhythm(user, include_archived: bool = False) -> List[Dict[str, Any]]:
     """
     List personal missions with computed rhythm data.
     
     Uses prefetch_related to efficiently load met_periods in one query,
     then computes the rhythm timeline for each mission.
+    
+    Args:
+        user: The owner of the missions
+        include_archived: If False (default), excludes archived missions.
+                         If True, returns all missions including archived.
     """
-    missions = (
+    queryset = (
         PersonalMission.objects
         .filter(owner=user)
         .prefetch_related("met_periods")
         .order_by('-updated_at', '-created_at')
+    )
+    
+    if not include_archived:
+        queryset = queryset.filter(archived_at__isnull=True)
+    
+    today = timezone.localdate()
+    return [serialize_mission_with_rhythm(m, today) for m in queryset]
+
+
+def list_archived_personal_missions_with_rhythm(user) -> List[Dict[str, Any]]:
+    """
+    List only archived personal missions with computed rhythm data.
+    
+    Used for lazy-loading archived missions in the UI accordion.
+    """
+    missions = (
+        PersonalMission.objects
+        .filter(owner=user, archived_at__isnull=False)
+        .prefetch_related("met_periods")
+        .order_by('-archived_at', '-updated_at')
     )
     
     today = timezone.localdate()
