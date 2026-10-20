@@ -16,7 +16,17 @@ from notifications.api import router as notifications_router
 from base.utils.exceptions import NotFoundError, ForbiddenError
 
 
-api = NinjaAPI()
+api = NinjaAPI(
+    title="GIK Missions API",
+    version="1.0.0",
+    description=(
+        "Backend API for the GIK Missions platform.\n\n"
+        "**Consumers:** souls_app (Dart/Flutter), missions-web-admin (React/TS), gik-client (Next.js).\n\n"
+        "OpenAPI schema available at `/api/openapi.json` for client code generation."
+    ),
+    docs_url="/docs/",  # Interactive docs at /api/docs/
+    openapi_url="/openapi.json",  # BR-5: stable schema path for client codegen
+)
 
 
 @api.get("/health/")

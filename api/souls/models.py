@@ -5,7 +5,7 @@ from django.http import HttpRequest
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel, client_id_field
-from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
+from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome, GuardianRelationship
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -35,6 +35,18 @@ class Soul(BaseModel):
     possible_duplicate_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='possible_duplicates')
     deleted_at = models.DateTimeField(null=True, blank=True, help_text="Tombstone, set when merged into another soul")
 
+    # Guardian consent fields for minors (age_group in {0-12, 13-17})
+    guardian_name = models.CharField(max_length=150, null=True, blank=True)
+    guardian_relationship = models.CharField(
+        max_length=20,
+        choices=GuardianRelationship.choices,
+        null=True,
+        blank=True
+    )
+    guardian_consent_given = models.BooleanField(default=False)
+    guardian_consent_date = models.DateTimeField(null=True, blank=True)
+    guardian_phone = PhoneNumberField(null=True, blank=True)
+
     class Meta:
         db_table = "souls"
         indexes = [
@@ -63,6 +75,12 @@ class Soul(BaseModel):
             "user_full_name": str(self.user.get_full_name()) if self.user else None,
             "soul_full_name": self.get_full_name(),
             "follow_up_health": compute_follow_up_health(self),
+            # Guardian consent fields for minors
+            "guardian_name": self.guardian_name,
+            "guardian_relationship": self.guardian_relationship,
+            "guardian_consent_given": self.guardian_consent_given,
+            "guardian_consent_date": self.guardian_consent_date.isoformat() if self.guardian_consent_date else None,
+            "guardian_phone": str(self.guardian_phone) if self.guardian_phone else None,
         })
         return data
 

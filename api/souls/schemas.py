@@ -6,7 +6,7 @@ from typing import Optional
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import JourneyStage, ContactOutcome, FollowUpHealth, ProgressUpdateType, ProgressUpdateOutcome
+from souls.constants import JourneyStage, ContactOutcome, FollowUpHealth, ProgressUpdateType, ProgressUpdateOutcome, GuardianRelationship
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -41,6 +41,7 @@ class SoulsQuery(BaseQuery):
     user: Optional[int] = None
     sort_by: Optional[SoulsListByEnum] = None
     is_desc: Optional[bool] = True
+    minors_without_consent: Optional[bool] = None  # BR-4: filter for compliance report
 
 
 class SoulCreate(Schema):
@@ -68,6 +69,12 @@ class SoulCreate(Schema):
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: bool = False
     do_not_contact_at: Optional[datetime.datetime] = None
+    # Guardian consent fields for minors (age_group in {0-12, 13-17})
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[GuardianRelationship] = None
+    guardian_consent_given: bool = False
+    guardian_consent_date: Optional[datetime.datetime] = None
+    guardian_phone: Optional[str] = None
 
 
 class SoulUpdate(Schema):
@@ -91,6 +98,12 @@ class SoulUpdate(Schema):
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: Optional[bool] = None
     do_not_contact_at: Optional[datetime.datetime] = None
+    # Guardian consent fields for minors
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[GuardianRelationship] = None
+    guardian_consent_given: Optional[bool] = None
+    guardian_consent_date: Optional[datetime.datetime] = None
+    guardian_phone: Optional[str] = None
 
 class ProgressUpdateSummary(BaseOut):
     """Schema for progress update output."""
@@ -133,6 +146,12 @@ class SoulOut(BaseOut):
     do_not_contact: bool = False
     do_not_contact_at: Optional[str] = None
     possible_duplicate_of: Optional[int] = None
+    # Guardian consent fields for minors
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[str] = None
+    guardian_consent_given: bool = False
+    guardian_consent_date: Optional[str] = None
+    guardian_phone: Optional[str] = None
 
 
 class SoulMergeIn(Schema):

@@ -24,13 +24,14 @@ router = Router(
 )
 def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
     """API endpoint to list souls with optional filters and pagination."""
-    filters = params.dict(exclude={'follow_up_health', 'sort_by', 'is_desc', 'page', 'page_size'})
+    filters = params.dict(exclude={'follow_up_health', 'sort_by', 'is_desc', 'page', 'page_size', 'minors_without_consent'})
     souls = selectors.list_souls(
         user=request.user,
         filters=filters,
         sort_by=params.sort_by,
         is_desc=params.is_desc,
-        follow_up_health=params.follow_up_health
+        follow_up_health=params.follow_up_health,
+        minors_without_consent=params.minors_without_consent or False,
     )
     response = paginate_response(
         queryset=souls,

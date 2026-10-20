@@ -91,6 +91,71 @@ def _stamp_consent_and_contact_fields(data: dict, existing_consent_recorded_at=N
         data["consent_recorded_at"] = timezone.now()
     if data.get("do_not_contact") and not data.get("do_not_contact_at") and not existing_do_not_contact_at:
         data["do_not_contact_at"] = timezone.now()
+    # Auto-stamp guardian_consent_date when guardian_consent_given flips to True
+    if data.get("guardian_consent_given") and not data.get("guardian_consent_date"):
+        data["guardian_consent_date"] = timezone.now()
+
+
+# Age groups that require guardian consent (minors: 0-12 and 13-17)
+MINOR_AGE_GROUPS = {AgeGroupCategory.CHILD, AgeGroupCategory.YOUNG_TEEN}
+
+
+def _validate_guardian_consent_for_minor(data: dict, existing_soul=None):
+    """
+    Validate guardian consent fields for minors per BR-4.
+
+    For minors (age_group in {0-12, 13-17}), consent_given can only be accepted
+    as True when guardian_name, guardian_relationship, and guardian_consent_given
+    are all set.
+
+    On create: check data.
+    On update: merge data with existing soul fields.
+    """
+    # Determine the effective age_group (from data or existing soul)
+    age_group = data.get("age_group")
+    if age_group is None and existing_soul:
+        age_group = existing_soul.age_group
+    if age_group is None:
+        return  # Cannot validate without an age group
+
+    # Check if this is a minor
+    is_minor = age_group in MINOR_AGE_GROUPS or age_group in {ag.value for ag in MINOR_AGE_GROUPS}
+    if not is_minor:
+        return  # Not a minor, no guardian consent required
+
+    # Determine effective consent_given
+    consent_given = data.get("consent_given")
+    if consent_given is None and existing_soul:
+        consent_given = existing_soul.consent_given
+
+    if not consent_given:
+        return  # consent_given is False/None, validation passes (no claim of consent)
+
+    # consent_given is True for a minor -- require guardian fields
+    guardian_name = data.get("guardian_name")
+    if guardian_name is None and existing_soul:
+        guardian_name = existing_soul.guardian_name
+
+    guardian_relationship = data.get("guardian_relationship")
+    if guardian_relationship is None and existing_soul:
+        guardian_relationship = existing_soul.guardian_relationship
+
+    guardian_consent_given = data.get("guardian_consent_given")
+    if guardian_consent_given is None and existing_soul:
+        guardian_consent_given = existing_soul.guardian_consent_given
+
+    missing = []
+    if not guardian_name:
+        missing.append("guardian_name")
+    if not guardian_relationship:
+        missing.append("guardian_relationship")
+    if not guardian_consent_given:
+        missing.append("guardian_consent_given")
+
+    if missing:
+        raise CustomValidationError(
+            "For minors (age 0-17), consent_given requires guardian information: {}".format(", ".join(missing))
+        )
 
 
 def _split_full_name(full_name: str) -> tuple[str, str]:
@@ -133,6 +198,7 @@ def create_soul(user, data) -> Soul:
             if data.get(key) is not None:
                 data[key] = resolver(data[key])
         _stamp_consent_and_contact_fields(data)
+        _validate_guardian_consent_for_minor(data)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"])
         
@@ -165,6 +231,7 @@ def update_soul(user, soul_id, data) -> Soul:
         if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
             raise CustomValidationError("contact_outcome is immutable once set")
         _stamp_consent_and_contact_fields(data, soul.consent_recorded_at, soul.do_not_contact_at)
+        _validate_guardian_consent_for_minor(data, existing_soul=soul)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"], exclude_id=soul.id)
         # Resolve personal_mission_client_id → personal_mission int FK before

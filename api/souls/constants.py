@@ -35,3 +35,10 @@ class ProgressUpdateOutcome(TextChoices):
     REACHED = "reached", _("Reached")
     NO_ANSWER = "no_answer", _("No answer")
     RESCHEDULED = "rescheduled", _("Rescheduled")
+
+
+class GuardianRelationship(TextChoices):
+    """Guardian relationship types for minor safeguarding."""
+    PARENT = "parent", _("Parent")
+    LEGAL_GUARDIAN = "legal_guardian", _("Legal Guardian")
+    OTHER = "other", _("Other")

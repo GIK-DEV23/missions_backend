@@ -18,6 +18,11 @@ from base.utils.helpers import apply_sorting
 from souls.constants import FollowUpHealth
 from souls.filters import SoulFilter
 from souls.models import Soul, ProgressUpdate
+from users.constants import AgeGroupCategory
+
+
+# Age groups that require guardian consent
+MINOR_AGE_GROUPS = {AgeGroupCategory.CHILD, AgeGroupCategory.YOUNG_TEEN}
 
 
 def compute_follow_up_health(soul: Soul) -> Optional[str]:
@@ -112,7 +117,8 @@ def list_souls(
     filters: Optional[Dict[str, Any]] = None,
     sort_by: Optional[str] = None,
     is_desc: bool = True,
-    follow_up_health: Optional[FollowUpHealth] = None
+    follow_up_health: Optional[FollowUpHealth] = None,
+    minors_without_consent: bool = False,
 ):
     """List souls with optional filters."""
     if sort_by is None:
@@ -133,6 +139,12 @@ def list_souls(
         qs = SoulFilter(filters, queryset=qs).qs
     if follow_up_health:
         qs = filter_by_follow_up_health(qs, follow_up_health)
+    # BR-4: filter minors without guardian consent for compliance reporting
+    if minors_without_consent:
+        qs = qs.filter(
+            age_group__in=[ag.value for ag in MINOR_AGE_GROUPS],
+            guardian_consent_given=False,
+        )
     return qs
 
 
