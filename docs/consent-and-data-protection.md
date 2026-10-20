@@ -58,3 +58,4 @@ The `/users/me/stats/` endpoint includes `souls_without_consent_count` to help u
 
 - [Privacy Policy](./privacy-policy.md) — Full privacy policy document
 - [Pagination Contract](./pagination.md) — API response formats
+- [Compliance Implementation Spec](./compliance-implementation-spec.md) — Backend endpoints for GDPR/CCPA compliance (data export, deletion audit, consent sync)
