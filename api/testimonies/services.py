@@ -13,6 +13,8 @@ from users.selectors import user_details
 from souls.models import Soul
 from souls.selectors import get_soul
 from missions.selectors import mission_details
+from audit_logs.services import log_moderation_action
+from audit_logs.constants import ActionType, ContentType
 
 
 def create_testimony(data: dict) -> Testimony:
@@ -85,19 +87,48 @@ def delete_testimony(testimony_id: int) -> Testimony:
         raise CustomValidationError(str(e))
 
 
-def approve_testimony(testimony_id: int) -> Testimony:
+def approve_testimony(testimony_id: int, moderator=None) -> Testimony:
     testimony = testimony_details(testimony_id)
+    previous_status = testimony.review_status
     testimony.review_status = ReviewStatus.APPROVED
     testimony.rejection_reason = None
     testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.APPROVE,
+            content_type=ContentType.TESTIMONY,
+            content_id=testimony.id,
+            content_title=testimony.title,
+            previous_status=previous_status,
+            new_status=ReviewStatus.APPROVED
+        )
+    
     return testimony
 
 
-def reject_testimony(testimony_id: int, reason: str) -> Testimony:
+def reject_testimony(testimony_id: int, reason: str, moderator=None) -> Testimony:
     testimony = testimony_details(testimony_id)
+    previous_status = testimony.review_status
     testimony.review_status = ReviewStatus.REJECTED
     testimony.rejection_reason = reason
     testimony.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.REJECT,
+            content_type=ContentType.TESTIMONY,
+            content_id=testimony.id,
+            content_title=testimony.title,
+            previous_status=previous_status,
+            new_status=ReviewStatus.REJECTED,
+            rejection_reason=reason
+        )
+    
     return testimony
 
 
@@ -170,19 +201,48 @@ def delete_miracle(miracle_id: int) -> Miracle:
         raise CustomValidationError(str(e))
 
 
-def approve_miracle(miracle_id: int) -> Miracle:
+def approve_miracle(miracle_id: int, moderator=None) -> Miracle:
     miracle = miracle_details(miracle_id)
+    previous_status = miracle.review_status
     miracle.review_status = ReviewStatus.APPROVED
     miracle.rejection_reason = None
     miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.APPROVE,
+            content_type=ContentType.MIRACLE,
+            content_id=miracle.id,
+            content_title=miracle.title,
+            previous_status=previous_status,
+            new_status=ReviewStatus.APPROVED
+        )
+    
     return miracle
 
 
-def reject_miracle(miracle_id: int, reason: str) -> Miracle:
+def reject_miracle(miracle_id: int, reason: str, moderator=None) -> Miracle:
     miracle = miracle_details(miracle_id)
+    previous_status = miracle.review_status
     miracle.review_status = ReviewStatus.REJECTED
     miracle.rejection_reason = reason
     miracle.save(update_fields=["review_status", "rejection_reason", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.REJECT,
+            content_type=ContentType.MIRACLE,
+            content_id=miracle.id,
+            content_title=miracle.title,
+            previous_status=previous_status,
+            new_status=ReviewStatus.REJECTED,
+            rejection_reason=reason
+        )
+    
     return miracle
 
 

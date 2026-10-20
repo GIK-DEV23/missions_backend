@@ -132,7 +132,7 @@ def delete_miracle_api(request, miracle_id: int):
 )
 @require_permission("approve_miracle")
 def approve_miracle_api(request, miracle_id: int):
-    miracle = services.approve_miracle(miracle_id=miracle_id)
+    miracle = services.approve_miracle(miracle_id=miracle_id, moderator=request.user)
     return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
 
 
@@ -143,7 +143,7 @@ def approve_miracle_api(request, miracle_id: int):
 )
 @require_permission("reject_miracle")
 def reject_miracle_api(request, miracle_id: int, reject_in: schemas.RejectSchema):
-    miracle = services.reject_miracle(miracle_id=miracle_id, reason=reject_in.reason)
+    miracle = services.reject_miracle(miracle_id=miracle_id, reason=reject_in.reason, moderator=request.user)
     return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
 
 
@@ -210,7 +210,7 @@ def delete_testimony_api(request, testimony_id: int):
 )
 @require_permission("approve_testimony")
 def approve_testimony_api(request, testimony_id: int):
-    testimony = services.approve_testimony(testimony_id=testimony_id)
+    testimony = services.approve_testimony(testimony_id=testimony_id, moderator=request.user)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
 
 
@@ -221,7 +221,7 @@ def approve_testimony_api(request, testimony_id: int):
 )
 @require_permission("reject_testimony")
 def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSchema):
-    testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason)
+    testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason, moderator=request.user)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
 
 
