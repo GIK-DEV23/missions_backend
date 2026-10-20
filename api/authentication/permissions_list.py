@@ -163,7 +163,7 @@ STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
 
 ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
     "view_user",
-    "list_users"
+    "list_users",
     "add_user",
     "update_user",
     "delete_user",
@@ -180,7 +180,7 @@ ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
     "view_admin_stats",
     "view_missioner_stats",
     "view_auditlog",
-    "list_permissions"
+    "list_permissions",
     "delete_jia_participant",
     "view_auditlog",
     "list_auditlogs",
