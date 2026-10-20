@@ -24,6 +24,8 @@ class SoulsListByEnum(str, Enum):
     FIRST_NAME = 'first_name'
     PHONE_NUMBER = 'phone_number'
     DATE_ADDED = 'date_added'
+    NEXT_CHECK_IN_AT = 'next_check_in_at'
+    LAST_CONTACTED_AT = 'last_contacted_at'
 
 
 class SoulsQuery(BaseQuery):

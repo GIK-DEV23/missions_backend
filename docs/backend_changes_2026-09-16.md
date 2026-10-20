@@ -77,7 +77,7 @@ Staff and Admin inherit from `MISSIONER_PERMISSIONS`, so they automatically get 
 ## 3. Mission Status: `REGISTERING`
 
 ### Change
-Ensured the `REGISTERING` status is properly defined in the mission status enum.
+Ensured the mission status enum is properly defined.
 
 ### Justification
 The mobile app filters missions by status to show "Open for Registration" cards on the home screen. The `registering` status indicates missions that are accepting participant sign-ups.
@@ -86,23 +86,18 @@ The mobile app filters missions by status to show "Open for Registration" cards 
 
 **File:** `api/missions/constants.py`
 ```python
-class MissionStatus(models.TextChoices):
-    UPCOMING = 'upcoming', _('Upcoming')
+class MissionStatusType(models.TextChoices):
+    PLANNING = 'planning', _('Planning')
     REGISTERING = 'registering', _('Registering')
-    LIVE = 'live', _('Live')
-    COMPLETE = 'complete', _('Complete')
-    CANCELLED = 'cancelled', _('Cancelled')
+    ACTIVE = 'active', _('Active')
+    COMPLETED = 'completed', _('Completed')
+    ON_HOLD = 'on_hold', _('On Hold')
 ```
 
-**File:** `api/missions/schemas.py`
-```python
-class MissionStatus(str, Enum):
-    UPCOMING = 'upcoming'
-    REGISTERING = 'registering'
-    LIVE = 'live'
-    COMPLETE = 'complete'
-    CANCELLED = 'cancelled'
-```
+> **Note (2026-10-20):** The original doc showed a different enum (`upcoming/live/complete/cancelled`).
+> The actual implementation uses `planning/registering/active/completed/on_hold`. This doc has been
+> corrected. There is no separate schema enum — Django Ninja derives the schema from the model's
+> `TextChoices`.
 
 ---
 

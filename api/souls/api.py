@@ -43,7 +43,7 @@ def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
     return JsonResponse(response, safe=False)
 
 
-@require_permission("souls_stats")
+@require_permission("soul_stats")
 @router.get(
     "/stats/",
     response={200: dict, 400: DetailOut},

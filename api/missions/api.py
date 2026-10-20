@@ -149,7 +149,7 @@ def delete_mission_category_api(request, category_id: int):
 
 @router.get(
     "/analytics/overview/",
-    response={200: dict, 400: DetailOut},
+    response={200: schemas.YearlyAnalyticsOut, 400: DetailOut},
     auth=jwt_auth
 )
 @require_permission("view_admin_stats")
@@ -169,7 +169,7 @@ def system_analytics_api(request, year: int = None):
 
 @router.get(
     "/analytics/{mission_id}/",
-    response={200: dict, 400: DetailOut},
+    response={200: schemas.PerMissionAnalyticsOut, 400: DetailOut},
     auth=jwt_auth
 )
 @require_permission("view_mission_report")

@@ -107,6 +107,7 @@ def system_wide_analytics(year: Optional[int] = None):
     missions_summary = {
         "total": all_missions.count(),
         "active": all_missions.filter(status="active").count(),
+        "registering": all_missions.filter(status="registering").count(),
         "completed": all_missions.filter(status="completed").count(),
         "planning": all_missions.filter(status="planning").count(),
         "on_hold": all_missions.filter(status="on_hold").count(),
