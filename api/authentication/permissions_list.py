@@ -99,6 +99,20 @@ ALL_PERMISSIONS = {
     # here, so neither could be assigned to a custom role.
     "flag_log_suspicious",
     "unflag_log_suspicious",
+    # BR-2: organisation-wide personal missions, for admin oversight. Distinct
+    # from list_personal_missions, which is the owner-scoped read.
+    "list_all_personal_missions",
+    # BR-3: composing notifications rather than only reading them.
+    "send_notification",
+    "broadcast_notification",
+    # Declared here because a route or a role template already required them
+    # while the master set did not list them, which made each unassignable: the
+    # Roles page only offers what this set contains, so no custom role could
+    # ever be given them and only an admin (who bypasses the check) could use
+    # the endpoint.
+    "activate_user",
+    "deactivate_user",
+    "sign_up",
 }
 
 # Permission templates for different roles
@@ -188,6 +202,10 @@ STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
     "view_content_report",
     "review_content_report",
     "view_moderation_stats",
+    # Oversight of everyone's personal missions, and sending to named users.
+    # Broadcasting to a whole audience stays admin-only.
+    "list_all_personal_missions",
+    "send_notification",
 }
 
 ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
@@ -222,6 +240,12 @@ ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
     "cancel_user_deletion",
     "set_legal_hold",
     "remove_legal_hold",
+    # Fanning out to a whole audience, not just named recipients.
+    "broadcast_notification",
+    # Required by /users/activate/{id}/ and /users/deactivate/{id}/, which
+    # previously demanded a permission no role declared.
+    "activate_user",
+    "deactivate_user",
 }
 
 EXEC_PERMISSIONS = {
@@ -261,6 +285,7 @@ EXEC_PERMISSIONS = {
     "list_content_reports",
     "view_content_report",
     "view_moderation_stats",
+    "list_all_personal_missions",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS

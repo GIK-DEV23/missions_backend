@@ -149,6 +149,67 @@ def personal_mission_details(personal_mission_id: int) -> PersonalMission:
         raise NotFoundError("PersonalMission with ID {} does not exist".format(personal_mission_id))
 
 
+# ─── Organisation-wide reads (BR-2) ───────────────────────────────────────────
+
+def list_all_personal_missions(filters: Optional[Dict[str, Any]] = None):
+    """Every user's personal missions, for admin oversight.
+
+    The owner-scoped list at GET /personal-missions/ returns request.user's own
+    records, so an admin page built on it shows the admin's own missions rather
+    than the organisation's. This is the separate, permission-gated read that
+    an admin surface needs; the owner-scoped route is left exactly as mobile
+    depends on it.
+    """
+    filters = filters or {}
+    queryset = (
+        PersonalMission.objects
+        .select_related("owner")
+        .prefetch_related("met_periods")
+    )
+
+    owner_id = filters.get("user")
+    if owner_id:
+        queryset = queryset.filter(owner_id=owner_id)
+
+    mission_type = filters.get("type")
+    if mission_type:
+        queryset = queryset.filter(type=mission_type)
+
+    rhythm = filters.get("rhythm")
+    if rhythm:
+        queryset = queryset.filter(rhythm=rhythm)
+
+    if not filters.get("include_archived"):
+        queryset = queryset.filter(archived_at__isnull=True)
+
+    return queryset.order_by("-updated_at", "-created_at")
+
+
+def paginate_personal_missions_with_rhythm(queryset, page: int, page_size: int) -> Dict[str, Any]:
+    """Paginate admin-scoped missions, computing each one's rhythm timeline.
+
+    Hand-rolled rather than base.api.paginate_response because the rhythm
+    fields are computed per row rather than living on the model, so a plain
+    to_dict would omit them.
+    """
+    from django.core.paginator import Paginator
+
+    from base.utils.exceptions import CustomValidationError
+
+    paginator = Paginator(queryset, page_size)
+    if page > paginator.num_pages:
+        raise CustomValidationError("Invalid page number")
+    current = paginator.get_page(page)
+    today = timezone.localdate()
+    return {
+        "count": paginator.count,
+        "page": current.number,
+        "page_size": page_size,
+        "last_page": paginator.num_pages,
+        "data": [serialize_mission_with_rhythm(m, today) for m in current],
+    }
+
+
 def list_sessions(user, mission_id: int) -> List[PersonalMissionSession]:
     """
     List all sessions for a personal mission.
