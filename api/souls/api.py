@@ -23,7 +23,11 @@ router = Router(
     auth=jwt_auth
 )
 def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
-    """API endpoint to list souls with optional filters and pagination."""
+    """API endpoint to list souls with optional filters and pagination.
+    
+    Phone numbers are masked by default for privacy. Use the /reveal_phone/{soul_id}
+    endpoint to get the unmasked phone number for a specific soul.
+    """
     filters = params.dict(exclude={'follow_up_health', 'sort_by', 'is_desc', 'page', 'page_size', 'minors_without_consent'})
     souls = selectors.list_souls(
         user=request.user,
@@ -38,7 +42,8 @@ def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
         request=request,
         schema=schemas.SoulOut,
         page=params.page,
-        page_size=params.page_size
+        page_size=params.page_size,
+        to_dict_kwargs={'mask_phone': True}  # Always mask phones in list view
     )
     return JsonResponse(response, safe=False)
 
@@ -142,7 +147,11 @@ def merge_soul_api(request, soul_id: int, merge_in: schemas.SoulMergeIn):
 )
 def progress_updates_list_api(request, params: schemas.ProgressUpdateQuery = Query(...)):
     """API endpoint to list progress updates with optional soul filter and pagination."""
-    progress_updates = selectors.list_progress_updates(**params.dict())
+    # Only pass selector-relevant params (exclude pagination fields from BaseQuery)
+    progress_updates = selectors.list_progress_updates(
+        soul_id=params.soul_id,
+        is_desc=params.is_desc if params.is_desc is not None else True
+    )
     response = paginate_response(
         queryset=progress_updates,
         request=request,
@@ -236,6 +245,30 @@ def soul_details_api(request, soul_id: int):
     """API endpoint to retrieve details of a specific soul by ID."""
     soul = selectors.get_soul(soul_id=soul_id)
     return schemas.SoulDetailsOut(**soul.to_dict_details(request))
+
+
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
+)
+@router.get(
+    "/{soul_id}/reveal_phone/",
+    response={200: schemas.PhoneRevealOut},
+    auth=jwt_auth
+)
+def reveal_phone_api(request, soul_id: int):
+    """API endpoint to reveal the unmasked phone number for a specific soul.
+    
+    This is a separate endpoint for audit purposes - accessing unmasked phone
+    numbers is tracked separately from viewing soul details.
+    """
+    soul = selectors.get_soul(soul_id=soul_id)
+    return schemas.PhoneRevealOut(
+        soul_id=soul.id,
+        phone_number=str(soul.phone_number) if soul.phone_number else None,
+        guardian_phone=str(soul.guardian_phone) if soul.guardian_phone else None,
+    )
 
 
 @require_permission(

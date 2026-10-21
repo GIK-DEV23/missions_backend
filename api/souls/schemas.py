@@ -124,6 +124,7 @@ class SoulOut(BaseOut):
     first_name: str
     last_name: str
     phone_number: str
+    phone_number_masked: bool = False  # Indicates if phone_number is masked
     gender: str
     age_group: str
     location_id: Optional[int] = None
@@ -153,6 +154,13 @@ class SoulOut(BaseOut):
     guardian_relationship: Optional[str] = None
     guardian_consent_given: bool = False
     guardian_consent_date: Optional[str] = None
+    guardian_phone: Optional[str] = None
+
+
+class PhoneRevealOut(Schema):
+    """Schema for revealing unmasked phone numbers."""
+    soul_id: int
+    phone_number: Optional[str] = None
     guardian_phone: Optional[str] = None
 
 

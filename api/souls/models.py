@@ -1,5 +1,7 @@
 from typing import Optional
 
+from typing import Optional
+
 from django.db import models
 from django.http import HttpRequest
 from phonenumber_field.modelfields import PhoneNumberField
@@ -60,9 +62,23 @@ class Soul(BaseModel):
     def __str__(self):
         return self.get_full_name()
 
-    def to_dict(self, request: Optional[HttpRequest] = None):
+    def to_dict(self, request: Optional[HttpRequest] = None, mask_phone: bool = False):
         from souls.selectors import compute_follow_up_health
+        from souls.utils import mask_phone_number
+        
         data = super().to_dict()
+        
+        # Apply phone masking if requested
+        if mask_phone:
+            data['phone_number'] = mask_phone_number(data.get('phone_number'))
+            data['phone_number_masked'] = True
+        else:
+            data['phone_number_masked'] = False
+        
+        guardian_phone_value = str(self.guardian_phone) if self.guardian_phone else None
+        if mask_phone and guardian_phone_value:
+            guardian_phone_value = mask_phone_number(guardian_phone_value)
+        
         data.update({
             "location_id": self.location.id if self.location else None,
             "location_name": self.location.name if self.location else None,
@@ -80,12 +96,12 @@ class Soul(BaseModel):
             "guardian_relationship": self.guardian_relationship,
             "guardian_consent_given": self.guardian_consent_given,
             "guardian_consent_date": self.guardian_consent_date.isoformat() if self.guardian_consent_date else None,
-            "guardian_phone": str(self.guardian_phone) if self.guardian_phone else None,
+            "guardian_phone": guardian_phone_value,
         })
         return data
 
-    def to_dict_details(self, request: Optional[HttpRequest] = None):
-        data = self.to_dict(request)
+    def to_dict_details(self, request: Optional[HttpRequest] = None, mask_phone: bool = False):
+        data = self.to_dict(request, mask_phone=mask_phone)
         # get first and last progress update
         progress_updates = self.progress_updates.all().order_by('-update_date', '-created_at')
         if not progress_updates.exists():
