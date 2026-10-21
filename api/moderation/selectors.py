@@ -59,6 +59,21 @@ def list_reports(filters: Optional[Dict[str, Any]] = None) -> QuerySet[ContentRe
     return queryset.order_by("-created_at")
 
 
+def list_reports_by_reporter(reporter) -> QuerySet[ContentReport]:
+    """A reporter's own reports, newest first.
+
+    Separate from list_reports because that is the REVIEW queue: it is gated on
+    `list_content_reports`, which an ordinary missioner does not hold, and it
+    spans every reporter. Someone who filed a report still needs to see what
+    happened to it, which is what the mobile "my reports" screen shows.
+    """
+    return (
+        ContentReport.objects.filter(reporter=reporter)
+        .select_related("reviewed_by")
+        .order_by("-created_at")
+    )
+
+
 # ─── Content preview ──────────────────────────────────────────────────────────
 
 def _submission_preview(model, content_id: int) -> Optional[Dict[str, Any]]:

@@ -89,6 +89,34 @@ def bulk_update_reports_api(request, body: schemas.ContentReportBulkUpdate):
 
 
 @router.get(
+    "/reports/mine/",
+    response={200: dict, 400: DetailOut},
+    auth=jwt_auth,
+)
+@require_permission("create_content_report")
+def my_reports_list_api(request, params: schemas.ReportsQuery = Query(...)):
+    """The caller's OWN reports.
+
+    Gated on `create_content_report`, not `list_content_reports`: anyone who
+    can file a report may see what happened to theirs, while the review queue
+    at GET /reports/ stays restricted to reviewers. Owner-scoped, so it never
+    exposes another reporter's submissions.
+
+    No content preview — a reporter should not be handed back an excerpt of
+    content a reviewer may since have removed.
+    """
+    reports = selectors.list_reports_by_reporter(request.user)
+    response = paginate_response(
+        queryset=reports,
+        request=request,
+        schema=schemas.ContentReportOut,
+        page=params.page,
+        page_size=params.page_size,
+    )
+    return JsonResponse(response, safe=False)
+
+
+@router.get(
     "/reports/{report_id}/",
     response={200: schemas.ContentReportOut, 404: DetailOut},
     auth=jwt_auth,
