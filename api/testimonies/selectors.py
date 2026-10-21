@@ -3,29 +3,50 @@ Selectors for testimonies and miracles - simple helpers that return QuerySets or
 """
 from typing import Optional
 from django.db.models import Q
+from django.utils import timezone
 
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import NotFoundError
 from testimonies.filters import TestimonyFilter, MiracleFilter
 from testimonies.models import Testimony, Miracle
+from testimonies.constants import ReviewStatus
 
 
 def testimonies_list(filters: Optional[dict] = None):
-    qs = Testimony.objects.select_related('soul', 'user', 'mission').all()
+    qs = Testimony.objects.select_related('soul', 'user', 'mission').all().order_by('-updated_at', '-created_at')
     if not filters:
         return qs
 
     return TestimonyFilter(filters, queryset=qs).qs
 
 
+def featured_testimonies_list(limit: int = 5):
+    """
+    Get testimonies that have been selected by admins for featuring.
+    These are public testimonies that are both:
+    - is_selected=True (admin selected)
+    - review_status='approved' (approved for publication)
+    - Either no expiry (featured_until is null) or expiry is in the future
+    
+    Ordered by feature_order (lower first), then by updated_at (newest first).
+    """
+    now = timezone.now()
+    return Testimony.objects.select_related('soul', 'user', 'mission').filter(
+        is_selected=True,
+        review_status=ReviewStatus.APPROVED,
+    ).filter(
+        Q(featured_until__isnull=True) | Q(featured_until__gt=now)
+    ).order_by('feature_order', '-updated_at', '-created_at')[:limit]
+
+
 def testimony_details(testimony_id: int) -> Testimony:
    try:
          return Testimony.objects.get(id=testimony_id)
    except Testimony.DoesNotExist:
-       raise CustomValidationError("Testimony with ID {} does not exist".format(testimony_id))
+       raise NotFoundError("Testimony with ID {} does not exist".format(testimony_id))
 
 
 def miracles_list(filters: Optional[dict] = None):
-    qs = Miracle.objects.select_related('soul', 'user', 'mission').all()
+    qs = Miracle.objects.select_related('soul', 'user', 'mission').all().order_by('-updated_at', '-created_at')
     if not filters:
         return qs
 
@@ -36,4 +57,4 @@ def miracle_details(miracle_id: int) -> Miracle:
     try:
         return Miracle.objects.get(id=miracle_id)
     except Miracle.DoesNotExist:
-        raise CustomValidationError("Miracle with ID {} does not exist".format(miracle_id))
+        raise NotFoundError("Miracle with ID {} does not exist".format(miracle_id))

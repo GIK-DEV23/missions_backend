@@ -13,9 +13,20 @@ from testimonies.api import router as testimonies_router
 from sync.api import router as sync_router
 from personal_missions.api import router as personal_missions_router
 from notifications.api import router as notifications_router
+from base.utils.exceptions import NotFoundError, ForbiddenError
 
 
-api = NinjaAPI()
+api = NinjaAPI(
+    title="GIK Missions API",
+    version="1.0.0",
+    description=(
+        "Backend API for the GIK Missions platform.\n\n"
+        "**Consumers:** souls_app (Dart/Flutter), missions-web-admin (React/TS), gik-client (Next.js).\n\n"
+        "OpenAPI schema available at `/api/openapi.json` for client code generation."
+    ),
+    docs_url="/docs/",  # Interactive docs at /api/docs/
+    openapi_url="/openapi.json",  # BR-5: stable schema path for client codegen
+)
 
 
 @api.get("/health/")
@@ -39,6 +50,16 @@ def validation_errors(request: HttpRequest, exc: Union[ValidationError, str]) ->
     if isinstance(exc, str):
         response = {"detail": exc}
     else:
-        response = {"detail": exc.errors}
+        response = {"detail": exc.errors()}
 
     return api.create_response(request, response, status=400)
+
+
+@api.exception_handler(NotFoundError)
+def not_found_errors(request: HttpRequest, exc: NotFoundError) -> HttpResponse:
+    return api.create_response(request, {"detail": exc.message}, status=404)
+
+
+@api.exception_handler(ForbiddenError)
+def forbidden_errors(request: HttpRequest, exc: ForbiddenError) -> HttpResponse:
+    return api.create_response(request, {"detail": exc.message}, status=403)

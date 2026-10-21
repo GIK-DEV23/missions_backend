@@ -132,7 +132,7 @@ def delete_miracle_api(request, miracle_id: int):
 )
 @require_permission("approve_miracle")
 def approve_miracle_api(request, miracle_id: int):
-    miracle = services.approve_miracle(miracle_id=miracle_id)
+    miracle = services.approve_miracle(miracle_id=miracle_id, moderator=request.user)
     return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
 
 
@@ -143,8 +143,23 @@ def approve_miracle_api(request, miracle_id: int):
 )
 @require_permission("reject_miracle")
 def reject_miracle_api(request, miracle_id: int, reject_in: schemas.RejectSchema):
-    miracle = services.reject_miracle(miracle_id=miracle_id, reason=reject_in.reason)
+    miracle = services.reject_miracle(miracle_id=miracle_id, reason=reject_in.reason, moderator=request.user)
     return 200, schemas.MiracleOutSchema(**miracle.to_dict(request))
+
+
+@router.get(
+    "/featured/",
+    response={200: List[schemas.TestimonyOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+def featured_testimonies_list_api(request, limit: int = 5):
+    """
+    Get testimonies that have been selected by admins for featuring on the home screen.
+    These are public testimonies that have been approved and marked as selected.
+    No special permission required - featured testimonies are public content.
+    """
+    testimonies = selectors.featured_testimonies_list(limit=limit)
+    return 200, [schemas.TestimonyOutSchema(**t.to_dict(request)) for t in testimonies]
 
 
 @router.get(
@@ -195,7 +210,7 @@ def delete_testimony_api(request, testimony_id: int):
 )
 @require_permission("approve_testimony")
 def approve_testimony_api(request, testimony_id: int):
-    testimony = services.approve_testimony(testimony_id=testimony_id)
+    testimony = services.approve_testimony(testimony_id=testimony_id, moderator=request.user)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
 
 
@@ -206,5 +221,60 @@ def approve_testimony_api(request, testimony_id: int):
 )
 @require_permission("reject_testimony")
 def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSchema):
-    testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason)
+    testimony = services.reject_testimony(testimony_id=testimony_id, reason=reject_in.reason, moderator=request.user)
     return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/{testimony_id}/feature/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def feature_testimony_api(request, testimony_id: int, feature_in: schemas.FeatureTestimonySchema):
+    """Feature a testimony on the home screen."""
+    testimony = services.feature_testimony(
+        testimony_id=testimony_id,
+        duration_days=feature_in.duration_days,
+        feature_order=feature_in.feature_order,
+        moderator=request.user
+    )
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/{testimony_id}/unfeature/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def unfeature_testimony_api(request, testimony_id: int):
+    """Remove a testimony from featured highlights."""
+    testimony = services.unfeature_testimony(testimony_id=testimony_id, moderator=request.user)
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/featured/reorder/",
+    response={200: List[schemas.TestimonyOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def reorder_featured_testimonies_api(request, reorder_in: schemas.ReorderFeaturedSchema):
+    """Reorder featured testimonies. IDs should be in desired display order."""
+    testimonies = services.reorder_featured_testimonies(
+        testimony_ids=reorder_in.testimony_ids,
+        moderator=request.user
+    )
+    return 200, [schemas.TestimonyOutSchema(**t.to_dict(request)) for t in testimonies]
+
+
+@router.post(
+    "/anonymous/",
+    response={201: schemas.TestimonyOutSchema, 400: DetailOut, 429: DetailOut},
+)
+def create_anonymous_testimony_api(request, testimony_in: schemas.AnonymousTestimonyCreate):
+    """Submit a testimony anonymously. Rate limited by device token."""
+    data = testimony_in.dict()
+    testimony = services.create_anonymous_testimony(data)
+    return 201, schemas.TestimonyOutSchema(**testimony.to_dict(request))

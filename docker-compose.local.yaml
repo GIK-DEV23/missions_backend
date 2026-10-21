@@ -1,0 +1,86 @@
+# Local development compose — mounts source code so Django auto-reloads on
+# file saves. No nginx, no watchtower. Backend + DB + Redis only.
+#
+# Usage:
+#   docker compose -f docker-compose.local.yaml up
+#   docker compose -f docker-compose.local.yaml up --build   # after Dockerfile changes
+#   docker compose -f docker-compose.local.yaml down
+#
+# The backend container runs Django's dev server with --reload, so saving any
+# .py file restarts the server automatically — no docker cp or container
+# restart needed.
+
+services:
+  backend:
+    build: .
+    container_name: missions_backend
+    env_file:
+      - .env
+    ports:
+      - "9050:8000"
+    volumes:
+      # Mount the entire api/ directory so edits on the host are immediately
+      # visible inside the container and trigger Django's auto-reloader.
+      - ./api:/app/api
+      - static_volume:/app/static
+      - media_volume:/app/media
+    command: >
+      sh -c "cd api &&
+             python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: missions_postgres
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    environment:
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:latest
+    container_name: missions_redis
+    env_file:
+      - .env
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      REDIS_URL: ${REDIS_URL}
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:

@@ -2,7 +2,7 @@ import uuid
 
 from django.test import TestCase
 
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, NotFoundError
 from personal_missions import services, selectors
 from personal_missions.constants import PersonalMissionType, PersonalMissionRhythm
 from personal_missions.models import PersonalMission
@@ -68,7 +68,7 @@ class PersonalMissionTests(TestCase):
 
     def test_cannot_access_another_users_personal_mission(self):
         pm = services.create_personal_mission(self.other_user, self._data())
-        with self.assertRaises(CustomValidationError):
+        with self.assertRaises(NotFoundError):
             selectors.get_personal_mission(self.owner, pm.id)
 
     def test_update_switching_to_ongoing_with_what_happened_rejected(self):

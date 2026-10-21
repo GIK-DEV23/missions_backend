@@ -4,7 +4,7 @@ import uuid
 
 from django.test import TestCase
 
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, NotFoundError
 from souls import services
 from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
 from souls.models import Soul
@@ -13,6 +13,15 @@ from users.models import User
 
 
 class ClientIdTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="client_id_tester@example.com",
+            password="pass1234",
+            username="client_id_tester",
+            first_name="Test",
+            last_name="User",
+        )
+
     def _soul_data(self, **overrides):
         data = {
             "first_name": "Jane",
@@ -28,18 +37,18 @@ class ClientIdTests(TestCase):
 
     def test_create_soul_echoes_client_id(self):
         client_id = uuid.uuid4()
-        soul = services.create_soul(self._soul_data(client_id=client_id))
+        soul = services.create_soul(self.user, self._soul_data(client_id=client_id))
         self.assertEqual(soul.client_id, client_id)
 
     def test_duplicate_client_id_rejected(self):
         client_id = uuid.uuid4()
-        services.create_soul(self._soul_data(client_id=client_id))
+        services.create_soul(self.user, self._soul_data(client_id=client_id))
         with self.assertRaises(CustomValidationError):
-            services.create_soul(self._soul_data(phone_number="+254700000002", client_id=client_id))
+            services.create_soul(self.user, self._soul_data(phone_number="+254700000002", client_id=client_id))
 
     def test_progress_update_resolves_soul_by_client_id(self):
         client_id = uuid.uuid4()
-        soul = services.create_soul(self._soul_data(client_id=client_id))
+        soul = services.create_soul(self.user, self._soul_data(client_id=client_id))
         progress_update = services.create_progress_update({
             "soul_client_id": client_id,
             "content": "Checked in",
@@ -48,7 +57,7 @@ class ClientIdTests(TestCase):
         self.assertEqual(progress_update.soul_id, soul.id)
 
     def test_progress_update_prefers_soul_id_when_both_given(self):
-        soul = services.create_soul(self._soul_data(client_id=uuid.uuid4()))
+        soul = services.create_soul(self.user, self._soul_data(client_id=uuid.uuid4()))
         other_client_id = uuid.uuid4()
         progress_update = services.create_progress_update({
             "soul_id": soul.id,
@@ -74,9 +83,9 @@ class ClientIdTests(TestCase):
             })
 
     def test_update_progress_update_resolves_soul_by_client_id(self):
-        soul_a = services.create_soul(self._soul_data(client_id=uuid.uuid4()))
+        soul_a = services.create_soul(self.user, self._soul_data(client_id=uuid.uuid4()))
         soul_b_client_id = uuid.uuid4()
-        soul_b = services.create_soul(self._soul_data(phone_number="+254700000003", client_id=soul_b_client_id))
+        soul_b = services.create_soul(self.user, self._soul_data(phone_number="+254700000003", client_id=soul_b_client_id))
         progress_update = services.create_progress_update({
             "soul_id": soul_a.id,
             "content": "Checked in",
@@ -114,21 +123,21 @@ class JourneyStageAndContactOutcomeTests(TestCase):
         return data
 
     def test_create_soul_stores_contact_outcome(self):
-        soul = services.create_soul(self._soul_data(contact_outcome=ContactOutcome.BORN_AGAIN))
+        soul = services.create_soul(self.user, self._soul_data(contact_outcome=ContactOutcome.BORN_AGAIN))
         self.assertEqual(soul.contact_outcome, ContactOutcome.BORN_AGAIN)
 
     def test_contact_outcome_is_immutable_once_set(self):
-        soul = services.create_soul(self._soul_data(contact_outcome=ContactOutcome.BORN_AGAIN))
+        soul = services.create_soul(self.user, self._soul_data(contact_outcome=ContactOutcome.BORN_AGAIN))
         with self.assertRaises(CustomValidationError):
             services.update_soul(user=self.user, soul_id=soul.id, data={"contact_outcome": ContactOutcome.NOT_YET})
 
     def test_contact_outcome_can_be_set_later_if_previously_unset(self):
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         updated = services.update_soul(user=self.user, soul_id=soul.id, data={"contact_outcome": ContactOutcome.ALREADY_BELIEVER})
         self.assertEqual(updated.contact_outcome, ContactOutcome.ALREADY_BELIEVER)
 
     def test_contact_outcome_update_to_same_value_allowed(self):
-        soul = services.create_soul(self._soul_data(contact_outcome=ContactOutcome.NOT_YET))
+        soul = services.create_soul(self.user, self._soul_data(contact_outcome=ContactOutcome.NOT_YET))
         updated = services.update_soul(user=self.user, soul_id=soul.id, data={"contact_outcome": ContactOutcome.NOT_YET})
         self.assertEqual(updated.contact_outcome, ContactOutcome.NOT_YET)
 
@@ -136,7 +145,7 @@ class JourneyStageAndContactOutcomeTests(TestCase):
         migration = importlib.import_module(
             "souls.migrations.0004_soul_contact_outcome_alter_soul_status"
         )
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         Soul.objects.filter(id=soul.id).update(status="active")
 
         class _FakeApps:
@@ -158,7 +167,7 @@ class ProgressUpdateDetailsTests(TestCase):
             first_name="Author",
             last_name="User",
         )
-        self.soul = services.create_soul({
+        self.soul = services.create_soul(self.author, {
             "first_name": "Jane",
             "last_name": "Doe",
             "phone_number": "+254700000009",
@@ -262,32 +271,32 @@ class ConsentDuplicateAndMergeTests(TestCase):
         return data
 
     def test_consent_recorded_at_stamped_when_consent_given_on_create(self):
-        soul = services.create_soul(self._soul_data(consent_given=True))
+        soul = services.create_soul(self.user, self._soul_data(consent_given=True))
         self.assertIsNotNone(soul.consent_recorded_at)
 
     def test_consent_recorded_at_not_stamped_without_consent(self):
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         self.assertIsNone(soul.consent_recorded_at)
 
     def test_explicit_consent_recorded_at_respected(self):
         explicit = dt.datetime(2025, 6, 1, tzinfo=dt.timezone.utc)
-        soul = services.create_soul(self._soul_data(consent_given=True, consent_recorded_at=explicit))
+        soul = services.create_soul(self.user, self._soul_data(consent_given=True, consent_recorded_at=explicit))
         self.assertEqual(soul.consent_recorded_at, explicit)
 
     def test_do_not_contact_at_stamped_on_update(self):
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         self.assertIsNone(soul.do_not_contact_at)
         updated = services.update_soul(self.user, soul.id, {"do_not_contact": True})
         self.assertIsNotNone(updated.do_not_contact_at)
 
     def test_second_soul_with_same_phone_flagged_as_duplicate(self):
-        original = services.create_soul(self._soul_data())
-        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        original = services.create_soul(self.user, self._soul_data())
+        duplicate = services.create_soul(self.user, self._soul_data(first_name="Janet"))
         self.assertEqual(duplicate.possible_duplicate_of_id, original.id)
         self.assertIsNone(original.possible_duplicate_of_id)
 
     def test_unique_phone_not_flagged(self):
-        soul = services.create_soul(self._soul_data(phone_number="+254700000021"))
+        soul = services.create_soul(self.user, self._soul_data(phone_number="+254700000021"))
         self.assertIsNone(soul.possible_duplicate_of_id)
 
     def test_update_resolves_location_mission_user_fks(self):
@@ -295,14 +304,14 @@ class ConsentDuplicateAndMergeTests(TestCase):
         from missions.constants import LocationCategoryType
 
         location = Location.objects.create(name="Nairobi", category=LocationCategoryType.TOWN, description="Capital")
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         updated = services.update_soul(self.user, soul.id, {"location": location.id, "user": self.user.id})
         self.assertEqual(updated.location_id, location.id)
         self.assertEqual(updated.user_id, self.user.id)
 
     def test_merge_reassigns_progress_updates_and_tombstones_duplicate(self):
-        original = services.create_soul(self._soul_data())
-        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        original = services.create_soul(self.user, self._soul_data())
+        duplicate = services.create_soul(self.user, self._soul_data(first_name="Janet"))
         pu = services.create_progress_update({
             "soul_id": duplicate.id,
             "content": "Called",
@@ -318,8 +327,8 @@ class ConsentDuplicateAndMergeTests(TestCase):
         self.assertIsNotNone(duplicate.deleted_at)
 
     def test_merge_clears_survivor_possible_duplicate_of(self):
-        original = services.create_soul(self._soul_data())
-        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        original = services.create_soul(self.user, self._soul_data())
+        duplicate = services.create_soul(self.user, self._soul_data(first_name="Janet"))
         self.assertEqual(duplicate.possible_duplicate_of_id, original.id)
 
         survivor = services.merge_souls(self.user, original.id, duplicate.id)
@@ -328,14 +337,95 @@ class ConsentDuplicateAndMergeTests(TestCase):
     def test_merged_soul_no_longer_resolvable(self):
         from souls.selectors import get_soul
 
-        original = services.create_soul(self._soul_data())
-        duplicate = services.create_soul(self._soul_data(first_name="Janet"))
+        original = services.create_soul(self.user, self._soul_data())
+        duplicate = services.create_soul(self.user, self._soul_data(first_name="Janet"))
         services.merge_souls(self.user, duplicate.id, original.id)
 
-        with self.assertRaises(CustomValidationError):
+        with self.assertRaises(NotFoundError):
             get_soul(duplicate.id)
 
     def test_cannot_merge_soul_into_itself(self):
-        soul = services.create_soul(self._soul_data())
+        soul = services.create_soul(self.user, self._soul_data())
         with self.assertRaises(CustomValidationError):
             services.merge_souls(self.user, soul.id, soul.id)
+
+
+class FullNameAndPhoneTests(TestCase):
+    """Option A: create accepts a single full_name (split into first/last) and
+    normalizes the phone to canonical Kenyan E.164."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="fullname_tester@example.com",
+            password="pass1234",
+            username="fullname_tester",
+            first_name="Test",
+            last_name="User",
+        )
+
+    def _data(self, **overrides):
+        data = {
+            "full_name": "Jane Doe",
+            "phone_number": "0712345678",
+            "gender": GenderType.FEMALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        }
+        data.update(overrides)
+        return data
+
+    def test_full_name_split_into_first_and_last(self):
+        soul = services.create_soul(self.user, self._data(full_name="Jane Mary Doe"))
+        self.assertEqual(soul.first_name, "Jane")
+        self.assertEqual(soul.last_name, "Mary Doe")
+
+    def test_single_word_full_name_allowed_with_blank_last_name(self):
+        soul = services.create_soul(self.user, self._data(full_name="Jane"))
+        self.assertEqual(soul.first_name, "Jane")
+        self.assertEqual(soul.last_name, "")
+        self.assertEqual(soul.get_full_name(), "Jane")
+
+    def test_blank_full_name_rejected(self):
+        with self.assertRaises(CustomValidationError):
+            services.create_soul(self.user, self._data(full_name="   "))
+
+    def test_phone_normalized_from_local_zero_format(self):
+        soul = services.create_soul(self.user, self._data(phone_number="0712345678"))
+        self.assertEqual(str(soul.phone_number), "+254712345678")
+
+    def test_phone_normalized_from_bare_subscriber(self):
+        soul = services.create_soul(
+            self.user, self._data(full_name="A B", phone_number="712345670")
+        )
+        self.assertEqual(str(soul.phone_number), "+254712345670")
+
+    def test_phone_normalized_from_spaced_input(self):
+        soul = services.create_soul(
+            self.user, self._data(full_name="A C", phone_number="+254 712 345 671")
+        )
+        self.assertEqual(str(soul.phone_number), "+254712345671")
+
+    def test_phone_accepts_01_prefix(self):
+        soul = services.create_soul(
+            self.user, self._data(full_name="A D", phone_number="0112345672")
+        )
+        self.assertEqual(str(soul.phone_number), "+254112345672")
+
+    def test_invalid_phone_rejected(self):
+        with self.assertRaises(CustomValidationError):
+            services.create_soul(self.user, self._data(phone_number="6786564654645"))
+
+    def test_backward_compatible_first_last_name(self):
+        # Internal callers that still pass first_name/last_name keep working.
+        soul = services.create_soul(self.user, {
+            "first_name": "Legacy",
+            "last_name": "Caller",
+            "phone_number": "0712345699",
+            "gender": GenderType.MALE,
+            "age_group": AgeGroupCategory.ADULT,
+            "status": JourneyStage.NEW_BELIEVER,
+            "date_added": "2026-01-01",
+        })
+        self.assertEqual(soul.first_name, "Legacy")
+        self.assertEqual(str(soul.phone_number), "+254712345699")

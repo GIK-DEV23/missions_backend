@@ -24,6 +24,16 @@ def get_own_profile_api(request):
     return schemas.UserProfileOut(**request.user.to_dict(request))
 
 
+@router.get(
+    "/me/stats/",
+    response={200: schemas.MeStatsOut},
+    auth=jwt_auth
+)
+def get_own_stats_api(request, params: schemas.MeStatsQuery = Query(...)):
+    stats = selectors.get_user_stats(request.user, params.time_filter)
+    return schemas.MeStatsOut(**stats)
+
+
 @router.patch(
     "/me/",
     response={200: schemas.UserProfileOut, 400: DetailOut},
@@ -138,7 +148,45 @@ def create_role_api(request, role_in: schemas.RoleCreate):
 
 
 @router.get(
-    "/{user_id}/",
+    "/check-email/",
+    response={200: schemas.EmailExistsOut}
+)
+def check_email_exists_api(request, email: str = Query(...)):
+    """
+    Check if an email address is already registered.
+    
+    This endpoint is public (no auth required) to allow checking
+    during the signup flow before credentials are submitted.
+    """
+    exists = services.check_email_exists(email)
+    return schemas.EmailExistsOut(exists=exists)
+
+
+# Registration defaults routes
+@router.get(
+    "/registration-defaults/",
+    response={200: schemas.RegistrationDefaultsOut},
+    auth=jwt_auth,
+)
+def get_registration_defaults_api(request):
+    """Get the user's saved registration defaults for pre-filling mission sign-up forms."""
+    return 200, schemas.RegistrationDefaultsOut(**selectors.get_registration_defaults(request.user))
+
+
+@router.put(
+    "/registration-defaults/",
+    response={200: schemas.RegistrationDefaultsOut, 400: DetailOut},
+    auth=jwt_auth,
+)
+def update_registration_defaults_api(request, defaults_in: schemas.RegistrationDefaultsUpdate):
+    """Save/update the user's registration defaults for pre-filling mission sign-up forms."""
+    user = services.update_registration_defaults(request.user, defaults_in.dict(exclude_unset=True))
+    return 200, schemas.RegistrationDefaultsOut(**selectors.get_registration_defaults(user))
+
+
+# Dynamic routes with path parameters - must be after static routes
+@router.get(
+    "/detail/{user_id}/",
     response={200: auth_schemas.UserData, 400: DetailOut},
     auth=jwt_auth
 )
@@ -161,3 +209,19 @@ def get_user_api(request, user_id: int):
 def get_role_api(request, role_id: int):
     role = selectors.role_details(role_id=role_id)
     return schemas.RoleOut(**role.to_dict())
+
+
+@router.delete(
+    "/me/",
+    response={200: DetailOut},
+    auth=jwt_auth
+)
+def delete_own_account_api(request):
+    """
+    Permanently delete the caller's own account.
+    
+    This anonymizes all personal data and deactivates the account.
+    The action cannot be undone.
+    """
+    services.delete_own_account(request.user)
+    return 200, DetailOut(detail="Account deleted successfully")

@@ -11,6 +11,7 @@ from base.schemas import BaseQuery, FilterQuery, BaseOut
 
 class MissionStatus(str, Enum):
     PLANNING = "planning"
+    REGISTERING = "registering"
     ACTIVE = "active"
     COMPLETED = "completed"
     ON_HOLD = "on_hold"
@@ -202,6 +203,7 @@ class MissionOutSchema(MinimalMissionOutSchema):
     location_id: int | None = None
     total_souls_followup: str | None = None
     banner_image: str | None = None
+    participants_count: int = 0
 
 
 class AttendanceDay(Schema):
@@ -313,3 +315,90 @@ class MissionGalleryOutSchema(BaseOut):
     image: str
     uploaded_by_id: int | None = None
     uploaded_by_name: str | None = None
+
+
+# --- Analytics Schemas ---
+
+
+class AgeGroupBreakdownItem(Schema):
+    """Age group statistics."""
+    age_group: str
+    count: int
+
+
+class GenderBreakdownItem(Schema):
+    """Gender statistics."""
+    gender: str | None
+    count: int
+
+
+class AnalyticsTotals(Schema):
+    """Soul totals for a mission or period."""
+    total_souls: int
+    born_again: int
+    in_follow_up: int
+
+
+class DailyBreakdown(Schema):
+    """Daily statistics for analytics."""
+    date: str
+    total: int
+    born_again: int
+    in_follow_up: int
+    age_group_breakdown: list[AgeGroupBreakdownItem]
+
+
+class MonthlyBreakdown(Schema):
+    """Monthly statistics for analytics."""
+    month: str
+    total: int
+    born_again: int
+    in_follow_up: int
+    age_group_breakdown: list[AgeGroupBreakdownItem]
+
+
+class MissionsSummary(Schema):
+    """Summary of missions by status."""
+    total: int
+    active: int
+    registering: int
+    completed: int
+    planning: int
+    on_hold: int
+
+
+class YearlyAnalyticsSummary(Schema):
+    """Summary statistics for a year."""
+    total_souls: int
+    born_again: int
+    in_follow_up: int
+
+
+class MissionInfo(Schema):
+    """Basic mission info for analytics."""
+    id: int
+    title: str
+    status: str
+    start_date: str
+    end_date: str
+    location: str | None
+    category: str | None
+    duration_days: int
+
+
+class YearlyAnalyticsOut(Schema):
+    """Yearly analytics response."""
+    year: int
+    summary: YearlyAnalyticsSummary
+    monthly_breakdown: list[MonthlyBreakdown]
+    missions_summary: MissionsSummary
+    age_group_totals: list[AgeGroupBreakdownItem]
+
+
+class PerMissionAnalyticsOut(Schema):
+    """Per-mission analytics response."""
+    mission: MissionInfo
+    totals: AnalyticsTotals
+    daily_breakdown: list[DailyBreakdown]
+    age_group_breakdown: list[AgeGroupBreakdownItem]
+    gender_breakdown: list[GenderBreakdownItem]
