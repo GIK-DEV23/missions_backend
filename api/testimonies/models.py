@@ -98,6 +98,15 @@ class Testimony(BaseModel):
         default=False,
         help_text="Indicates whether the testimony has been selected for publication",
     )
+    featured_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this testimony should stop being featured. Null = indefinitely featured (if is_selected=True)",
+    )
+    feature_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order for featured testimonies. Lower = higher priority.",
+    )
     visibility = models.CharField(max_length=20, choices=SubmissionVisibility.choices, default=SubmissionVisibility.PUBLIC)
     review_status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
     rejection_reason = models.TextField(null=True, blank=True)
@@ -124,6 +133,8 @@ class Testimony(BaseModel):
             "mission_title": self.mission.title if self.mission else None,
             "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
+            "featured_until": self.featured_until.isoformat() if self.featured_until else None,
+            "feature_order": self.feature_order,
         })
         return data
 

@@ -9,6 +9,7 @@ class ActionType(TextChoices):
     3. Edit staff, location or mission category
     4. Login/Logout
     5. Content moderation (approve/reject)
+    6. Featured highlights management
     '''
     LOGIN = "login", _("Login")
     LOGOUT = "logout", _("Logout")
@@ -21,6 +22,10 @@ class ActionType(TextChoices):
     REJECT = "reject", _("Reject")
     FLAG = "flag", _("Flag")
     UNFLAG = "unflag", _("Unflag")
+    # Featured highlights management
+    FEATURE = "feature", _("Feature")
+    UNFEATURE = "unfeature", _("Unfeature")
+    REORDER = "reorder", _("Reorder")
 
 
 ACTION_CATEGORIES = [

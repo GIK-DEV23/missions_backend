@@ -109,6 +109,101 @@ def approve_testimony(testimony_id: int, moderator=None) -> Testimony:
     return testimony
 
 
+def feature_testimony(testimony_id: int, duration_days: Optional[int] = None, feature_order: int = 0, moderator=None) -> Testimony:
+    """
+    Feature a testimony on the home screen.
+    
+    Args:
+        testimony_id: ID of the testimony to feature
+        duration_days: Number of days to feature (None = indefinite)
+        feature_order: Display order (lower = higher priority)
+        moderator: User performing the action
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    testimony = testimony_details(testimony_id)
+    
+    # Must be approved to be featured
+    if testimony.review_status != ReviewStatus.APPROVED:
+        raise CustomValidationError("Only approved testimonies can be featured.")
+    
+    testimony.is_selected = True
+    testimony.feature_order = feature_order
+    
+    if duration_days is not None and duration_days > 0:
+        testimony.featured_until = timezone.now() + timedelta(days=duration_days)
+    else:
+        testimony.featured_until = None  # Indefinite
+    
+    testimony.save(update_fields=["is_selected", "featured_until", "feature_order", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.FEATURE,
+            content_type=ContentType.TESTIMONY,
+            content_id=testimony.id,
+            content_title=testimony.title,
+            details=f"Featured for {duration_days} days" if duration_days else "Featured indefinitely"
+        )
+    
+    return testimony
+
+
+def unfeature_testimony(testimony_id: int, moderator=None) -> Testimony:
+    """Remove a testimony from the featured highlights."""
+    testimony = testimony_details(testimony_id)
+    
+    testimony.is_selected = False
+    testimony.featured_until = None
+    testimony.feature_order = 0
+    testimony.save(update_fields=["is_selected", "featured_until", "feature_order", "updated_at"])
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.UNFEATURE,
+            content_type=ContentType.TESTIMONY,
+            content_id=testimony.id,
+            content_title=testimony.title
+        )
+    
+    return testimony
+
+
+def reorder_featured_testimonies(testimony_ids: list, moderator=None) -> list:
+    """
+    Reorder featured testimonies by setting their feature_order based on position in the list.
+    
+    Args:
+        testimony_ids: List of testimony IDs in desired display order
+        moderator: User performing the action
+    """
+    updated = []
+    for order, testimony_id in enumerate(testimony_ids):
+        testimony = testimony_details(testimony_id)
+        if testimony.is_selected:
+            testimony.feature_order = order
+            testimony.save(update_fields=["feature_order", "updated_at"])
+            updated.append(testimony)
+    
+    # Log moderation action
+    if moderator:
+        log_moderation_action(
+            user=moderator,
+            action_type=ActionType.REORDER,
+            content_type=ContentType.TESTIMONY,
+            content_id=0,  # Not specific to one testimony
+            content_title="Featured testimonies",
+            details=f"Reordered {len(updated)} testimonies"
+        )
+    
+    return updated
+
+
 def reject_testimony(testimony_id: int, reason: str, moderator=None) -> Testimony:
     testimony = testimony_details(testimony_id)
     previous_status = testimony.review_status

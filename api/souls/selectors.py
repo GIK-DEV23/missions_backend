@@ -126,7 +126,14 @@ def list_souls(
     if isinstance(sort_by, Enum):
         sort_by = sort_by.value
     qs = Soul.objects.filter(deleted_at__isnull=True)
-    is_special_user = has_role_type("admin", user=user) or has_role_type("superadmin", user=user) or has_role_type("staff", user=user) or has_role_type("executive", user=user)
+    # Superusers and users with admin/staff/executive roles can see all souls
+    is_special_user = (
+        user.is_superuser or
+        has_role_type("admin", user=user) or
+        has_role_type("superadmin", user=user) or
+        has_role_type("staff", user=user) or
+        has_role_type("executive", user=user)
+    )
     if not is_special_user:
         qs = qs.filter(user=user)
     qs = apply_sorting(

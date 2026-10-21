@@ -226,6 +226,50 @@ def reject_testimony_api(request, testimony_id: int, reject_in: schemas.RejectSc
 
 
 @router.post(
+    "/{testimony_id}/feature/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def feature_testimony_api(request, testimony_id: int, feature_in: schemas.FeatureTestimonySchema):
+    """Feature a testimony on the home screen."""
+    testimony = services.feature_testimony(
+        testimony_id=testimony_id,
+        duration_days=feature_in.duration_days,
+        feature_order=feature_in.feature_order,
+        moderator=request.user
+    )
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/{testimony_id}/unfeature/",
+    response={200: schemas.TestimonyOutSchema, 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def unfeature_testimony_api(request, testimony_id: int):
+    """Remove a testimony from featured highlights."""
+    testimony = services.unfeature_testimony(testimony_id=testimony_id, moderator=request.user)
+    return 200, schemas.TestimonyOutSchema(**testimony.to_dict(request))
+
+
+@router.post(
+    "/featured/reorder/",
+    response={200: List[schemas.TestimonyOutSchema], 400: DetailOut},
+    auth=jwt_auth
+)
+@require_permission("feature_testimony")
+def reorder_featured_testimonies_api(request, reorder_in: schemas.ReorderFeaturedSchema):
+    """Reorder featured testimonies. IDs should be in desired display order."""
+    testimonies = services.reorder_featured_testimonies(
+        testimony_ids=reorder_in.testimony_ids,
+        moderator=request.user
+    )
+    return 200, [schemas.TestimonyOutSchema(**t.to_dict(request)) for t in testimonies]
+
+
+@router.post(
     "/anonymous/",
     response={201: schemas.TestimonyOutSchema, 400: DetailOut, 429: DetailOut},
 )

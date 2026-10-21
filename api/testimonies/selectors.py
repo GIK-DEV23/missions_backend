@@ -3,6 +3,7 @@ Selectors for testimonies and miracles - simple helpers that return QuerySets or
 """
 from typing import Optional
 from django.db.models import Q
+from django.utils import timezone
 
 from base.utils.exceptions import NotFoundError
 from testimonies.filters import TestimonyFilter, MiracleFilter
@@ -24,11 +25,17 @@ def featured_testimonies_list(limit: int = 5):
     These are public testimonies that are both:
     - is_selected=True (admin selected)
     - review_status='approved' (approved for publication)
+    - Either no expiry (featured_until is null) or expiry is in the future
+    
+    Ordered by feature_order (lower first), then by updated_at (newest first).
     """
+    now = timezone.now()
     return Testimony.objects.select_related('soul', 'user', 'mission').filter(
         is_selected=True,
         review_status=ReviewStatus.APPROVED,
-    ).order_by('-updated_at', '-created_at')[:limit]
+    ).filter(
+        Q(featured_until__isnull=True) | Q(featured_until__gt=now)
+    ).order_by('feature_order', '-updated_at', '-created_at')[:limit]
 
 
 def testimony_details(testimony_id: int) -> Testimony:

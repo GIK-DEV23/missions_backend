@@ -57,6 +57,8 @@ class TestimonyOutSchema(BaseOut):
     is_personal: bool = False
     photo_url: Optional[str] = None
     is_selected: bool = False
+    featured_until: Optional[datetime.datetime] = None
+    feature_order: int = 0
     visibility: str
     review_status: str
     rejection_reason: Optional[str] = None
@@ -126,3 +128,14 @@ class AnonymousTestimonyCreate(Schema):
     mission_id: int
     visibility: SubmissionVisibility = SubmissionVisibility.PUBLIC
     third_party_consent: bool = False
+
+
+class FeatureTestimonySchema(Schema):
+    """Schema for featuring a testimony on the home screen."""
+    duration_days: Optional[int] = None  # null = indefinite
+    feature_order: int = 0  # Lower = higher priority
+
+
+class ReorderFeaturedSchema(Schema):
+    """Schema for reordering featured testimonies."""
+    testimony_ids: List[int]  # IDs in desired display order

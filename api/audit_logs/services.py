@@ -42,9 +42,10 @@ def log_moderation_action(
     content_type: str,
     content_id: int,
     content_title: str,
-    previous_status: str,
-    new_status: str,
+    previous_status: str = None,
+    new_status: str = None,
     rejection_reason: str = None,
+    details: str = None,
     ip_address=None
 ):
     """
@@ -52,13 +53,14 @@ def log_moderation_action(
 
     Args:
         user: User instance performing the moderation action.
-        action_type: ActionType.APPROVE, ActionType.REJECT, etc.
+        action_type: ActionType.APPROVE, ActionType.REJECT, ActionType.FEATURE, etc.
         content_type: ContentType.TESTIMONY, ContentType.MIRACLE.
         content_id: ID of the content being moderated.
         content_title: Title of the content (for description).
-        previous_status: Review status before this action.
-        new_status: Review status after this action.
+        previous_status: Review status before this action (optional).
+        new_status: Review status after this action (optional).
         rejection_reason: Optional reason for rejection.
+        details: Optional additional details about the action.
         ip_address: Optional IP address.
 
     Returns:
@@ -67,10 +69,20 @@ def log_moderation_action(
     if ip_address is None:
         ip_address = cache.get("user_ip_{}".format(user.id))
 
-    action_verb = "approved" if action_type == ActionType.APPROVE else "rejected"
+    # Build description based on action type
+    action_verb_map = {
+        ActionType.APPROVE: "approved",
+        ActionType.REJECT: "rejected",
+        ActionType.FEATURE: "featured",
+        ActionType.UNFEATURE: "unfeatured",
+        ActionType.REORDER: "reordered",
+    }
+    action_verb = action_verb_map.get(action_type, action_type)
     description = f"{action_verb.capitalize()} {content_type} #{content_id}: {content_title[:50]}"
     if rejection_reason:
         description = f"{description} - Reason: {rejection_reason[:100]}"
+    if details:
+        description = f"{description} - {details}"
 
     audit_log = AuditLog.objects.create(
         user=user,
