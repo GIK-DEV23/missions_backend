@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from ninja import Schema
 
-from base.schemas import BaseOut, BaseQuery
+from base.schemas import BaseOut
 from personal_missions.constants import PersonalMissionType, PersonalMissionRhythm
 
 
@@ -33,19 +33,6 @@ class PersonalMissionUpdate(Schema):
     reminder_enabled: Optional[bool] = None
     reminder_time: Optional[datetime.time] = None
     what_happened: Optional[str] = None
-
-
-class AllPersonalMissionsQuery(BaseQuery):
-    """Filters for the organisation-wide admin list (BR-2).
-
-    `user` is the owner's id. Named `user` rather than `owner_id` to match the
-    filter key the souls list already uses for the same concept.
-    """
-
-    user: Optional[int] = None
-    type: Optional[PersonalMissionType] = None
-    rhythm: Optional[PersonalMissionRhythm] = None
-    include_archived: bool = False
 
 
 # ─── Session Schemas ───────────────────────────────────────────────────────────

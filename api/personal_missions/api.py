@@ -1,7 +1,6 @@
 from typing import List
 
-from django.http import JsonResponse
-from ninja import Query, Router
+from ninja import Router
 
 from authentication.permissions import jwt_auth
 from authentication.decorators import require_permission
@@ -21,29 +20,6 @@ def personal_missions_list_api(request):
     """Owner-scoped list of the caller's own personal missions (excludes archived)."""
     personal_missions = selectors.list_personal_missions_with_rhythm(user=request.user, include_archived=False)
     return personal_missions
-
-
-@router.get(
-    "/all/",
-    response={200: dict, 400: DetailOut},
-    auth=jwt_auth
-)
-@require_permission("list_all_personal_missions")
-def all_personal_missions_list_api(request, params: schemas.AllPersonalMissionsQuery = Query(...)):
-    """Organisation-wide list of every user's personal missions (BR-2).
-
-    Separate from GET /personal-missions/, which is owner-scoped: that route
-    returns the caller's own records, so an admin page built on it would show
-    the admin's missions rather than the organisation's. Filter by owner with
-    `user`, and by `type` / `rhythm`.
-    """
-    missions = selectors.list_all_personal_missions(
-        filters=params.dict(exclude={"page", "page_size"})
-    )
-    response = selectors.paginate_personal_missions_with_rhythm(
-        queryset=missions, page=params.page, page_size=params.page_size
-    )
-    return JsonResponse(response, safe=False)
 
 
 @router.get(

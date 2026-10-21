@@ -99,9 +99,6 @@ ALL_PERMISSIONS = {
     # here, so neither could be assigned to a custom role.
     "flag_log_suspicious",
     "unflag_log_suspicious",
-    # BR-2: organisation-wide personal missions, for admin oversight. Distinct
-    # from list_personal_missions, which is the owner-scoped read.
-    "list_all_personal_missions",
     # BR-3: composing notifications rather than only reading them.
     "send_notification",
     "broadcast_notification",
@@ -202,9 +199,8 @@ STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
     "view_content_report",
     "review_content_report",
     "view_moderation_stats",
-    # Oversight of everyone's personal missions, and sending to named users.
-    # Broadcasting to a whole audience stays admin-only.
-    "list_all_personal_missions",
+    # Sending to named users. Broadcasting to a whole audience stays
+    # admin-only.
     "send_notification",
 }
 
@@ -285,7 +281,6 @@ EXEC_PERMISSIONS = {
     "list_content_reports",
     "view_content_report",
     "view_moderation_stats",
-    "list_all_personal_missions",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS
