@@ -408,13 +408,68 @@ def validate_age_group(value, row):
         )
 
 
+#: Age buckets treated as minors. Mirrors MINOR_AGE_GROUPS in selectors.py.
+#: TODO: these two definitions should collapse into souls/constants.py.
+def _is_minor_age_group(value) -> bool:
+    if value is None:
+        return False
+    return str(value).strip().lower() in {ag.value for ag in MINOR_AGE_GROUPS}
+
+
+def _upload_phone_for_row(row, row_number: int, is_minor: bool):
+    """Resolve a row's phone, applying the same policy as the hand-entry clients.
+
+    A minor's phone is DROPPED even when the file supplies one: contact for a
+    minor goes through a guardian, and both souls_app and the dashboard clear
+    the field rather than store it. An import that kept it would be the one path
+    collecting exactly the data the rest of the system is careful to avoid.
+
+    An adult still needs one. The column itself is optional so a file of only
+    minors needs no phone column at all; an adult row without a number is
+    reported with its row number.
+    """
+    raw = row.get("phone_number")
+    # pandas yields None for a blank cell, and may type a numeric column as a
+    # float, so coerce rather than assuming str.
+    value = "" if raw is None else str(raw).strip()
+    if value.endswith(".0"):
+        value = value[:-2]
+
+    if is_minor:
+        return None
+
+    if not value:
+        raise CustomValidationError(
+            "Phone Number is required for row {} (age group '{}' is an adult). "
+            "Leave it blank only for minors (age groups: {}).".format(
+                row_number,
+                row.get("age_group"),
+                ", ".join(sorted(ag.value for ag in MINOR_AGE_GROUPS)),
+            )
+        )
+
+    # Normalize to canonical E.164, matching create_soul. Without this an
+    # uploaded "0712345678" and a created "+254712345678" are different strings,
+    # so neither _find_possible_duplicate nor the partial unique index on
+    # (name, phone, user, mission) recognises them as the same person.
+    try:
+        return normalize_kenyan_phone(value)
+    except CustomValidationError as e:
+        raise CustomValidationError(
+            "Row {}: {}".format(row_number, e.errors if hasattr(e, "errors") else e)
+        )
+
+
 def upload_souls(user, file, mission_id: int, location_id: int):
     try:
         mission = mission_details(mission_id)
         location = location_details(location_id)
 
+        # phone_number is deliberately NOT mandatory: it is required per ROW for
+        # adults and omitted for minors, which the parser's all-or-nothing
+        # mandatory check cannot express. _upload_phone_for_row does it instead.
         mandatory_fields = [
-            "missioner_email", "first_name", "last_name", "phone_number", "gender", "age_group", "description"
+            "missioner_email", "first_name", "last_name", "gender", "age_group", "description"
         ]
 
         readable_map = {
@@ -448,22 +503,34 @@ def upload_souls(user, file, mission_id: int, location_id: int):
         user_map = {u.email: u for u in users}
 
         souls_to_create = []
+        minor_phones_dropped = 0
 
-        for row in parsed_data:
-            user = user_map.get(row["missioner_email"])
-            if not user:
+        for index, row in enumerate(parsed_data):
+            # +2 for the header row, matching FileParser's own row numbering.
+            row_number = index + 2
+            # Named row_user, not user: this used to shadow the `user`
+            # parameter, so the audit entry below credited the LAST row's
+            # missioner with the upload instead of whoever performed it.
+            row_user = user_map.get(row["missioner_email"])
+            if not row_user:
                 raise CustomValidationError(f"No registered user found with email '{row['missioner_email']}'")
+
+            is_minor = _is_minor_age_group(row.get("age_group"))
+            phone_supplied = bool(str(row.get("phone_number") or "").strip())
+            phone_number = _upload_phone_for_row(row, row_number, is_minor)
+            if is_minor and phone_supplied:
+                minor_phones_dropped += 1
 
             soul = Soul(
                 first_name=row["first_name"].strip(),
                 last_name=row["last_name"].strip(),
-                phone_number=row["phone_number"].strip(),
+                phone_number=phone_number,
                 gender=row["gender"].lower().strip(),
                 age_group=row["age_group"].strip(),
                 description=row["description"].strip(),
                 mission=mission,
                 location=location,
-                user=user,
+                user=row_user,
                 date_added=row.get("date_added") or timezone.now().date(),
                 uploaded_at=timezone.now(),
             )
@@ -471,14 +538,26 @@ def upload_souls(user, file, mission_id: int, location_id: int):
 
         with transaction.atomic():
             Soul.objects.bulk_create(souls_to_create, batch_size=1000)
+        description = f"Uploaded {len(souls_to_create)} souls via file upload."
+        if minor_phones_dropped:
+            description += (
+                f" Discarded {minor_phones_dropped} phone number(s) supplied for minors."
+            )
         log_audit_event(
             user=user,
             action_type=ActionType.CREATION,
             action_category="souls",
-            action_description=f"Uploaded {len(souls_to_create)} souls via file upload.",
+            action_description=description,
             is_successful=True
         )
-        return {"message": f"{len(souls_to_create)} souls successfully uploaded."}
+        message = f"{len(souls_to_create)} souls successfully uploaded."
+        if minor_phones_dropped:
+            # Say so rather than silently dropping data the operator provided.
+            message += (
+                f" {minor_phones_dropped} phone number(s) supplied for minors were not"
+                " stored — contact for a minor goes through a guardian."
+            )
+        return {"message": message, "minor_phones_dropped": minor_phones_dropped}
     except CustomValidationError as e:
         raise e
     except Exception as e:
