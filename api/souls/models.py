@@ -54,10 +54,31 @@ class Soul(BaseModel):
         indexes = [
             models.Index(fields=['phone_number']),
         ]
-        # Note: phone_number removed from unique constraint since it's now optional
-        # for minors. Duplicate detection is handled by _find_possible_duplicate()
-        # in services.py for souls that DO have phone numbers.
-        unique_together = ('first_name', 'last_name', 'user', 'mission')
+        # Uniqueness is conditional on the phone being present.
+        #
+        # The original key was (first_name, last_name, phone_number, user,
+        # mission). When phone became optional for minors it was replaced by
+        # (first_name, last_name, user, mission) — which is STRICTLY TIGHTER,
+        # because the phone was the field distinguishing two people who share a
+        # name. That rejected the second "John Doe" an evangelist recorded on a
+        # mission even when the two had different numbers.
+        #
+        # This restores the original behaviour for souls that have a phone, and
+        # imposes no uniqueness at all on those that do not — which is the case
+        # minors are in by design, and where a hard constraint would block two
+        # genuinely different children with the same name.
+        #
+        # Phone-less duplicates are therefore not caught by the database.
+        # _find_possible_duplicate() in services.py only matches on phone, so it
+        # cannot cover them either; a name-based advisory check is the gap left
+        # open here deliberately rather than guessed at.
+        constraints = [
+            models.UniqueConstraint(
+                fields=['first_name', 'last_name', 'phone_number', 'user', 'mission'],
+                condition=models.Q(phone_number__isnull=False),
+                name='uniq_soul_name_phone_user_mission_when_phone_set',
+            ),
+        ]
 
     def get_full_name(self):
         return "{} {}".format(self.first_name, self.last_name).strip()
