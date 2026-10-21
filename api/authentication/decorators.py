@@ -2,7 +2,7 @@ from functools import wraps
 from django.http import JsonResponse
 
 from authentication.permissions import has_role_type
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import CustomValidationError, ForbiddenError
 
 
 def require_permission(permission_tag, restricted_roles=None, restriction_handler=None):
@@ -46,20 +46,16 @@ def require_permission(permission_tag, restricted_roles=None, restriction_handle
 
             if not restricted_roles:
                 return func(request, *args, **kwargs)
-            # TODO: Optimize if statements
-            print("RESTRICTED_ROLES", restricted_roles)
             if restricted_roles and restriction_handler:
                 role_names = [role.name.lower() for role in user_roles]
-                print("ROLE_NAMES", role_names)
                 restricted_lower = [r.lower() for r in restricted_roles]
-                print("RESTRICTED_LOWER", restricted_lower)
                 # Apply restriction only if ALL user roles are restricted
-                print("CONDITION", all(role_name in restricted_lower for role_name in role_names))
                 if all(role_name in restricted_lower for role_name in role_names):
                     try:
                         restriction_handler(user, kwargs)
-                    except CustomValidationError as e:
-                        return JsonResponse({"detail": str(e)}, status=403)
+                    except (CustomValidationError, ForbiddenError) as e:
+                        message = getattr(e, "message", None) or str(e)
+                        return JsonResponse({"detail": message}, status=403)
                     except Exception as e:
                         return JsonResponse({"detail": f"Restriction error: {e}"}, status=400)
 

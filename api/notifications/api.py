@@ -10,12 +10,12 @@ from notifications import schemas, services, selectors
 router = Router(tags=["notifications"])
 
 
-@require_permission("list_notifications")
 @router.get(
     "/",
     response={200: dict, 400: DetailOut},
     auth=jwt_auth
 )
+@require_permission("list_notifications")
 def notifications_list_api(request, params: schemas.NotificationsQuery = Query(...)):
     """Owner-scoped list of the caller's own notifications."""
     notifications = selectors.list_notifications(user=request.user)
@@ -31,12 +31,12 @@ def notifications_list_api(request, params: schemas.NotificationsQuery = Query(.
     return JsonResponse(response, safe=False)
 
 
-@require_permission("mark_notification_read")
 @router.post(
     "/{notification_id}/read/",
     response={200: schemas.NotificationOut, 400: DetailOut},
     auth=jwt_auth
 )
+@require_permission("mark_notification_read")
 def mark_notification_read_api(request, notification_id: int):
     notification = services.mark_notification_read(user=request.user, notification_id=notification_id)
     return 200, schemas.NotificationOut(**notification.to_dict(request))

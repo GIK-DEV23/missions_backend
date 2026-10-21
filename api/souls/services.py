@@ -22,7 +22,7 @@ from base.utils.helpers import validate_date, resolve_fk_by_client_id, normalize
 from missions.selectors import location_details, mission_details
 from personal_missions.models import PersonalMission
 from personal_missions.selectors import personal_mission_details
-from souls.models import Soul, ProgressUpdate
+from souls.models import Soul, ProgressUpdate, SoulAssignment
 from souls.selectors import get_soul, get_soul_by_client_id
 from users.constants import GenderType, AgeGroupCategory
 from users.models import User
@@ -496,25 +496,45 @@ def progress_update_handler(user, kwargs):
         soul = get_soul_by_client_id(soul_client_id)
     else:
         return None
-    if not soul.user or soul.user.pk != user.pk:
-        raise ForbiddenError("You can only view/write/edit/delete notes for souls assigned to you.")
-    return None
+    if soul.user and soul.user.pk == user.pk:
+        return None
+    # A co-carer named by an active SoulAssignment follows up this soul too,
+    # so they may read and write its progress updates.
+    is_co_carer = SoulAssignment.objects.filter(
+        soul_id=soul.pk, user_id=user.pk, is_active=True
+    ).exists()
+    if is_co_carer:
+        return None
+    raise ForbiddenError("You can only view/write/edit/delete notes for souls assigned to you.")
 
 
 def missioner_soul_operations_handler(user, kwargs):
     """
-    Restriction handler for missioners updating souls.
-    Ensures missioners can only update souls associated to them.
+    Restriction handler for missioners viewing/updating souls.
+
+    A missioner reaches a soul two ways, and both count as "assigned to you":
+      1. they recorded it     -> Soul.user is them
+      2. they are a co-carer  -> an active SoulAssignment names them
+
+    Only checking (1) would deny co-carers the souls SoulAssignment exists to
+    share, so both are honoured here.
     """
-    print("KWARGS", kwargs)
     soul_id = kwargs.get('soul_id')
     if not soul_id:
         raise CustomValidationError("Soul ID is required.")
 
     soul = get_soul(soul_id=soul_id)
 
-    if not soul.user or soul.user.pk != user.id:
-        raise ForbiddenError("You can only view/update souls assigned to you.")
+    if soul.user and soul.user.pk == user.pk:
+        return None
+
+    is_co_carer = SoulAssignment.objects.filter(
+        soul_id=soul.pk, user_id=user.pk, is_active=True
+    ).exists()
+    if is_co_carer:
+        return None
+
+    raise ForbiddenError("You can only view/update souls assigned to you.")
 
 
 def create_soul_assignment(user, data: dict):

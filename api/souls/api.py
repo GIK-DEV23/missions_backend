@@ -16,12 +16,12 @@ router = Router(
 )
 
 
-@require_permission("list_souls")
 @router.get(
     "/",
     response={200: List[schemas.SoulOut]},
     auth=jwt_auth
 )
+@require_permission("list_souls")
 def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
     """API endpoint to list souls with optional filters and pagination.
     
@@ -48,12 +48,12 @@ def souls_list_api(request, params: schemas.SoulsQuery = Query(...)):
     return JsonResponse(response, safe=False)
 
 
-@require_permission("soul_stats")
 @router.get(
     "/stats/",
     response={200: dict, 400: DetailOut},
     auth=jwt_auth
 )
+@require_permission("soul_stats")
 def souls_stats_api(request, params: schemas.SoulsQuery = Query(...)):
     """API endpoint to list souls with optional filters and pagination."""
     souls_count = selectors.souls_stats(
@@ -63,24 +63,24 @@ def souls_stats_api(request, params: schemas.SoulsQuery = Query(...)):
     return 200, souls_count
 
 
-@require_permission("create_soul")
 @router.post(
     "create/",
     response={201: schemas.SoulOut},
     auth=jwt_auth
 )
+@require_permission("create_soul")
 def create_soul_api(request, soul_in: schemas.SoulCreate):
     """API endpoint to create a new soul."""
     soul = services.create_soul(user=request.user, data=soul_in.dict())
     return 201, schemas.SoulOut(**soul.to_dict(request))
 
 
-@require_permission("upload_souls")
 @router.post(
     "/upload_souls/",
     response={200: dict, 400: DetailOut},
     auth=jwt_auth
 )
+@require_permission("upload_souls")
 def upload_souls_api(
     request,
     mission_id: int = Form(...),
@@ -103,48 +103,48 @@ def upload_souls_api(
     return JsonResponse(result)
 
 
-@require_permission("update_soul")
 @router.patch(
     "/{soul_id}/update/",
     response={200: schemas.SoulOut},
     auth=jwt_auth
 )
+@require_permission("update_soul")
 def update_soul_api(request, soul_id: int, soul_in: schemas.SoulUpdate):
     """API endpoint to update an existing soul."""
     soul = services.update_soul(user=request.user, soul_id=soul_id, data=soul_in.dict())
     return schemas.SoulOut(**soul.to_dict(request))
 
 
-@require_permission("delete_soul")
 @router.delete(
     "/{soul_id}/delete/",
     response={200: schemas.SoulOut},
     auth=jwt_auth
 )
+@require_permission("delete_soul")
 def delete_soul_api(request, soul_id: int):
     """API endpoint to delete a soul by ID."""
     soul = services.delete_soul(user=request.user, soul_id=soul_id)
     return schemas.SoulOut(**soul.to_dict(request))
 
 
-@require_permission("merge_soul")
 @router.post(
     "/{soul_id}/merge/",
     response={200: schemas.SoulOut, 400: DetailOut},
     auth=jwt_auth
 )
+@require_permission("merge_soul")
 def merge_soul_api(request, soul_id: int, merge_in: schemas.SoulMergeIn):
     """Merge a duplicate soul into another, reassigning its history."""
     survivor = services.merge_souls(user=request.user, soul_id=soul_id, into_id=merge_in.into_id)
     return schemas.SoulOut(**survivor.to_dict(request))
 
 
-@require_permission("list_progress_updates")
 @router.get(
     "progress_updates/",
     response={200: List[schemas.ProgressUpdateOut]},
     auth=jwt_auth
 )
+@require_permission("list_progress_updates")
 def progress_updates_list_api(request, params: schemas.ProgressUpdateQuery = Query(...)):
     """API endpoint to list progress updates with optional soul filter and pagination."""
     # Only pass selector-relevant params (exclude pagination fields from BaseQuery)
@@ -162,15 +162,15 @@ def progress_updates_list_api(request, params: schemas.ProgressUpdateQuery = Que
     return JsonResponse(response, safe=False)
 
 
-@require_permission(
-    "create_progress_update",
-    restricted_roles=["missioner_template"],
-    restriction_handler=progress_update_handler
-)
 @router.post(
     "progress_updates/create/",
     response={201: schemas.ProgressUpdateOut},
     auth=jwt_auth
+)
+@require_permission(
+    "create_progress_update",
+    restricted_roles=["missioner_template"],
+    restriction_handler=progress_update_handler
 )
 def create_progress_update_api(request, progress_update_in: schemas.ProgressUpdateCreate):
     """API endpoint to create a new progress update."""
@@ -179,15 +179,15 @@ def create_progress_update_api(request, progress_update_in: schemas.ProgressUpda
     return 201, schemas.ProgressUpdateOut(**progress_update.to_dict(request))
 
 
-@require_permission(
-    "view_progress_update",
-    restricted_roles=["missioner_template"],
-    restriction_handler=progress_update_handler
-)
 @router.get(
     "progress_updates/{progress_update_id}/",
     response={200: schemas.ProgressUpdateOut},
     auth=jwt_auth
+)
+@require_permission(
+    "view_progress_update",
+    restricted_roles=["missioner_template"],
+    restriction_handler=progress_update_handler
 )
 def progress_update_details_api(request, progress_update_id: int):
     """API endpoint to retrieve details of a specific progress update by ID."""
@@ -195,15 +195,15 @@ def progress_update_details_api(request, progress_update_id: int):
     return schemas.ProgressUpdateOut(**progress_update.to_dict(request))
 
 
-@require_permission(
-    "update_progress_update",
-    restricted_roles=["missioner_template"],
-    restriction_handler=progress_update_handler
-)
 @router.patch(
     "progress_updates/{progress_update_id}/update/",
     response={200: schemas.ProgressUpdateOut},
     auth=jwt_auth
+)
+@require_permission(
+    "update_progress_update",
+    restricted_roles=["missioner_template"],
+    restriction_handler=progress_update_handler
 )
 def update_progress_update_api(request, progress_update_id: int, progress_update_in: schemas.ProgressUpdateCreate):
     """API endpoint to update an existing progress update."""
@@ -214,15 +214,15 @@ def update_progress_update_api(request, progress_update_id: int, progress_update
     return schemas.ProgressUpdateOut(**progress_update.to_dict(request))
 
 
-@require_permission(
-    "delete_progress_update",
-    restricted_roles=["missioner_template"],
-    restriction_handler=progress_update_handler
-)
 @router.delete(
     "progress_updates/{progress_update_id}/delete/",
     response={200: schemas.ProgressUpdateOut},
     auth=jwt_auth
+)
+@require_permission(
+    "delete_progress_update",
+    restricted_roles=["missioner_template"],
+    restriction_handler=progress_update_handler
 )
 def delete_progress_update_api(request, progress_update_id: int):
     """API endpoint to delete a progress update by ID."""
@@ -230,16 +230,15 @@ def delete_progress_update_api(request, progress_update_id: int):
     return schemas.ProgressUpdateOut(**progress_update.to_dict(request))
 
 
-@require_permission(
-    "view_soul",
-    restricted_roles=["missioner_template"],
-    restriction_handler=missioner_soul_operations_handler
-)
-
 @router.get(
     "/{soul_id}/",
     response={200: schemas.SoulDetailsOut},
     auth=jwt_auth
+)
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
 )
 def soul_details_api(request, soul_id: int):
     """API endpoint to retrieve details of a specific soul by ID."""
@@ -247,15 +246,15 @@ def soul_details_api(request, soul_id: int):
     return schemas.SoulDetailsOut(**soul.to_dict_details(request))
 
 
-@require_permission(
-    "view_soul",
-    restricted_roles=["missioner_template"],
-    restriction_handler=missioner_soul_operations_handler
-)
 @router.get(
     "/{soul_id}/reveal_phone/",
     response={200: schemas.PhoneRevealOut},
     auth=jwt_auth
+)
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
 )
 def reveal_phone_api(request, soul_id: int):
     """API endpoint to reveal the unmasked phone number for a specific soul.
@@ -271,15 +270,15 @@ def reveal_phone_api(request, soul_id: int):
     )
 
 
-@require_permission(
-    "view_soul",
-    restricted_roles=["missioner_template"],
-    restriction_handler=missioner_soul_operations_handler
-)
 @router.get(
     "/{soul_id}/activity/",
     response={200: List[schemas.ProgressUpdateOut]},
     auth=jwt_auth
+)
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
 )
 def soul_activity_api(request, soul_id: int, params: schemas.ProgressUpdateQuery = Query(...)):
     """API endpoint to retrieve all progress updates for a specific soul."""
@@ -294,15 +293,15 @@ def soul_activity_api(request, soul_id: int, params: schemas.ProgressUpdateQuery
     return JsonResponse(response, safe=False)
 
 
-@require_permission(
-    "view_soul",
-    restricted_roles=["missioner_template"],
-    restriction_handler=missioner_soul_operations_handler
-)
 @router.get(
     "/{soul_id}/assignments/",
     response={200: List[schemas.SoulAssignmentOut]},
     auth=jwt_auth
+)
+@require_permission(
+    "view_soul",
+    restricted_roles=["missioner_template"],
+    restriction_handler=missioner_soul_operations_handler
 )
 def soul_assignments_list_api(request, soul_id: int):
     """List all assignments for a soul."""
@@ -310,12 +309,12 @@ def soul_assignments_list_api(request, soul_id: int):
     return [schemas.SoulAssignmentOut(**a.to_dict(request)) for a in assignments]
 
 
-@require_permission("assign_soul")
 @router.post(
     "/{soul_id}/assignments/",
     response={201: schemas.SoulAssignmentOut},
     auth=jwt_auth
 )
+@require_permission("assign_soul")
 def create_soul_assignment_api(request, soul_id: int, assignment_in: schemas.SoulAssignmentCreate):
     """Assign a user to follow up with a soul."""
     data = assignment_in.dict()
@@ -324,12 +323,12 @@ def create_soul_assignment_api(request, soul_id: int, assignment_in: schemas.Sou
     return 201, schemas.SoulAssignmentOut(**assignment.to_dict(request))
 
 
-@require_permission("assign_soul")
 @router.patch(
     "/assignments/{assignment_id}/",
     response={200: schemas.SoulAssignmentOut},
     auth=jwt_auth
 )
+@require_permission("assign_soul")
 def update_soul_assignment_api(request, assignment_id: int, assignment_in: schemas.SoulAssignmentUpdate):
     """Update an assignment (e.g., deactivate or add notes)."""
     data = {k: v for k, v in assignment_in.dict().items() if v is not None}
