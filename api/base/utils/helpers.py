@@ -94,12 +94,10 @@ def apply_sorting(
         allowed_fields = ["created_at"]
 
     # Fallback to created_at if not allowed
-    print(sort_by, allowed_fields)
     if sort_by not in allowed_fields:
         sort_by = "created_at"
 
     prefix = "-" if is_desc else ""
-    print(prefix + sort_by)
     return qs.order_by(f"{prefix}{sort_by}")
 
 
