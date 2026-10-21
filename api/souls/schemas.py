@@ -51,10 +51,14 @@ class SoulCreate(Schema):
 
     Accepts a single ``full_name`` (split server-side into first/last name),
     matching the mobile app's single name field.
+
+    phone_number is optional for minors (age groups 0-12 and 13-17) per
+    child-safety data minimisation policy -- contact should go through
+    guardians, not minors directly.
     """
     client_id: Optional[uuid.UUID] = None
     full_name: str
-    phone_number: str
+    phone_number: Optional[str] = None
     gender: GenderType
     age_group: AgeGroupCategory
     location: Optional[int] = None
@@ -123,7 +127,7 @@ class SoulOut(BaseOut):
     client_id: Optional[str] = None
     first_name: str
     last_name: str
-    phone_number: str
+    phone_number: Optional[str] = None
     phone_number_masked: bool = False  # Indicates if phone_number is masked
     gender: str
     age_group: str

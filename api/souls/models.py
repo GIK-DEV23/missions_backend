@@ -15,7 +15,7 @@ class Soul(BaseModel):
     client_id = client_id_field()
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100, blank=True, default="")
-    phone_number = PhoneNumberField()
+    phone_number = PhoneNumberField(null=True, blank=True, help_text="Optional for minors (age 0-17) per child-safety data minimisation")
     location = models.ForeignKey("missions.Location", on_delete=models.SET_NULL, null=True, blank=True, related_name='souls')
     status = models.CharField(max_length=50, choices=JourneyStage.choices, default=JourneyStage.NEW_BELIEVER)
     contact_outcome = models.CharField(max_length=30, choices=ContactOutcome.choices, null=True, blank=True)
@@ -54,7 +54,10 @@ class Soul(BaseModel):
         indexes = [
             models.Index(fields=['phone_number']),
         ]
-        unique_together = ('first_name', 'last_name', 'phone_number', 'user', 'mission')
+        # Note: phone_number removed from unique constraint since it's now optional
+        # for minors. Duplicate detection is handled by _find_possible_duplicate()
+        # in services.py for souls that DO have phone numbers.
+        unique_together = ('first_name', 'last_name', 'user', 'mission')
 
     def get_full_name(self):
         return "{} {}".format(self.first_name, self.last_name).strip()
