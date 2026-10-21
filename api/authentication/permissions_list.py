@@ -83,6 +83,22 @@ ALL_PERMISSIONS = {
     "archive_personal_mission",
     "list_notifications",
     "mark_notification_read",
+    # Moderation (BR-1): reactive content reports
+    "create_content_report",
+    "list_content_reports",
+    "view_content_report",
+    "review_content_report",
+    "view_moderation_stats",
+    # Moderation (BR-1): account erasure lifecycle
+    "request_own_deletion",
+    "view_user_deletion",
+    "cancel_user_deletion",
+    "set_legal_hold",
+    "remove_legal_hold",
+    # Audit log flagging — granted in ADMIN_PERMISSIONS but previously absent
+    # here, so neither could be assigned to a custom role.
+    "flag_log_suspicious",
+    "unflag_log_suspicious",
 }
 
 # Permission templates for different roles
@@ -130,6 +146,10 @@ MISSIONER_PERMISSIONS = {
     "archive_personal_mission",
     "list_notifications",
     "mark_notification_read",
+    # Any user must be able to report content they can see, and to ask for
+    # their own account to be erased.
+    "create_content_report",
+    "request_own_deletion",
 }
 
 STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
@@ -163,6 +183,11 @@ STAFF_PERMISSIONS = MISSIONER_PERMISSIONS | {
     "list_jia_participants",
     "delete_jia_participant",
     "upload_souls",
+    # Staff work the report queue; the erasure lifecycle stays admin-only.
+    "list_content_reports",
+    "view_content_report",
+    "review_content_report",
+    "view_moderation_stats",
 }
 
 ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
@@ -191,6 +216,12 @@ ADMIN_PERMISSIONS = STAFF_PERMISSIONS | {
     "list_auditlogs",
     "flag_log_suspicious",
     "unflag_log_suspicious",
+    # Account erasure oversight: who is pending deletion, and holding or
+    # cancelling one.
+    "view_user_deletion",
+    "cancel_user_deletion",
+    "set_legal_hold",
+    "remove_legal_hold",
 }
 
 EXEC_PERMISSIONS = {
@@ -226,6 +257,10 @@ EXEC_PERMISSIONS = {
     "sync_changes",
     "list_notifications",
     "mark_notification_read",
+    # Read-only oversight: exec sees the queue and the figures, reviews nothing.
+    "list_content_reports",
+    "view_content_report",
+    "view_moderation_stats",
 }
 
 SUPERUSER_PERMISSIONS = ALL_PERMISSIONS

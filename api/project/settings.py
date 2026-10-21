@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "audit_logs",
     "sync",
     "notifications",
+    "moderation",
 ]
 
 MIDDLEWARE = [

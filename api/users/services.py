@@ -256,36 +256,23 @@ def missioner_restriction_handler(user, kwargs):
 
 def delete_own_account(user: User) -> None:
     """
-    Soft-delete/anonymize a user's account for GDPR compliance.
-    
-    - Anonymizes personal data (name, email, phone, bio, photo)
-    - Keeps the record for audit trail with anonymized data
-    - Deactivates the account
-    - Invalidates all refresh tokens
+    Deprecated. Kept as a shim so any caller lands on the real lifecycle.
+
+    This used to scrub the User row immediately, which had two problems: it
+    checked no legal hold, so an account the organisation was required to
+    preserve could be erased by its own owner; and it was irreversible on the
+    first call, with no grace period for a mistaken or hijacked request. It
+    also left the account's content behind — private testimonies, personal
+    missions, notifications, and a mission registration's own copy of the
+    registrant's name and phone.
+
+    moderation.services handles all of that. Erasure itself is
+    moderation.services.perform_erasure, which runs only once the grace period
+    has elapsed and no hold stands.
     """
-    from authentication.models import RefreshToken
-    
-    with transaction.atomic():
-        RefreshToken.objects.filter(user=user).delete()
-        
-        user.email = f"deleted_{user.id}@deleted.local"
-        user.username = f"deleted_{user.id}"
-        user.first_name = "Deleted"
-        user.last_name = "User"
-        user.preferred_username = None
-        user.phone_number = None
-        user.bio = None
-        user.church = None
-        user.profile_photo = None
-        user.gender = None
-        user.travelling_from = None
-        user.diet_advisory = None
-        user.emergency_contact_name = None
-        user.emergency_contact_phone = None
-        user.saved_partner = None
-        user.is_active = False
-        user.set_unusable_password()
-        user.save()
+    from moderation.services import request_deletion
+
+    request_deletion(user)
 
 
 def check_email_exists(email: str) -> bool:

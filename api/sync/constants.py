@@ -7,6 +7,7 @@ class SyncEntity(TextChoices):
     CHECK_IN = "check_in", _("Check-in")
     TESTIMONY = "testimony", _("Testimony")
     MIRACLE = "miracle", _("Miracle")
+    CONTENT_REPORT = "content_report", _("Content report")
 
 
 class SyncOp(TextChoices):

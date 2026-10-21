@@ -4,6 +4,8 @@ from django.db import transaction, IntegrityError
 
 from authentication.permissions import has_role_type
 from base.utils.exceptions import CustomValidationError
+from moderation import services as moderation_services
+from moderation.models import ContentReport
 from souls import services as soul_services
 from souls.models import Soul, ProgressUpdate
 from testimonies import services as testimony_services
@@ -139,6 +141,24 @@ def _check_miracle_ownership(user, target):
         testimony_services.miracle_and_testimony_handler(user, {"soul_id": target.soul_id})
 
 
+# --- Content report ----------------------------------------------------
+# Create-only on purpose. A reporter files a report and that is the end of
+# their authority over it; status, resolution notes and takedown all belong to
+# a reviewer, so UPDATE and DELETE are simply absent from the permissions map
+# and apply_mutation rejects them as an unsupported op. This is what lets the
+# mobile app queue a report offline and sync it like any other record.
+
+def _create_content_report(user, client_id, payload):
+    payload["client_id"] = client_id
+    obj = moderation_services.create_report(reporter=user, data=payload)
+    return obj, obj.id
+
+
+def _check_content_report_ownership(user, target):
+    if target.reporter_id and target.reporter_id != user.pk:
+        raise SyncConflict("This report belongs to another user")
+
+
 ENTITY_REGISTRY = {
     SyncEntity.SOUL: {
         "model": Soul,
@@ -186,6 +206,16 @@ ENTITY_REGISTRY = {
             SyncOp.CREATE: "create_miracle",
             SyncOp.UPDATE: "update_miracle",
             SyncOp.DELETE: "delete_miracle",
+        },
+    },
+    SyncEntity.CONTENT_REPORT: {
+        "model": ContentReport,
+        "create": _create_content_report,
+        "update": None,
+        "delete": None,
+        "check_ownership": _check_content_report_ownership,
+        "permissions": {
+            SyncOp.CREATE: "create_content_report",
         },
     },
 }
