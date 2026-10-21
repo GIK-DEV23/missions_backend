@@ -141,7 +141,7 @@ def list_permissions_api(request, params: schemas.PermissionQuery = Query(...)):
     response={200: schemas.RoleOut, 400: DetailOut},
     auth=jwt_auth
 )
-@require_permission("create_role")
+@require_permission("add_role")
 def create_role_api(request, role_in: schemas.RoleCreate):
     role = services.create_role(
         name=role_in.name,

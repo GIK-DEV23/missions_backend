@@ -92,7 +92,7 @@ def content_moderation_history_api(request, content_type: str, content_id: int):
     auth=jwt_auth,
     response={200: schemas.AuditLogSchema, 400: DetailOut},
 )
-@require_permission("flag_suspicious_auditlog")
+@require_permission("flag_log_suspicious")
 def flag_suspicious_audit_log_api(request, id: int):
     """
     Flag an audit log entry as suspicious.
@@ -106,7 +106,7 @@ def flag_suspicious_audit_log_api(request, id: int):
     auth=jwt_auth,
     response={200: schemas.AuditLogSchema, 400: DetailOut},
 )
-@require_permission("unflag_suspicious_auditlog")
+@require_permission("unflag_log_suspicious")
 def unflag_suspicious_audit_log_api(request, id: int):
     """
     Unflag an audit log entry as suspicious.

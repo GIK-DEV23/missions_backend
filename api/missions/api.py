@@ -42,7 +42,7 @@ def locations_list_api(request, filters: schemas.LocationsFilterSchema = Query(.
     response={201: schemas.LocationOutSchema, 400: DetailOut},
     auth=jwt_auth
 )
-@require_permission("add_location")
+@require_permission("create_location")
 def create_location_api(request, location_in: schemas.LocationCreateSchema):
     location = services.create_location(user=request.user, **location_in.dict())
     return 201, schemas.LocationOutSchema(**location.to_dict(request))
