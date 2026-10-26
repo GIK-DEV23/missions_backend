@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from typing import Optional
+from typing import List, Optional
 
 from ninja import Schema
 
@@ -35,6 +35,36 @@ class PersonalMissionUpdate(Schema):
     what_happened: Optional[str] = None
 
 
+# ─── Session Schemas ───────────────────────────────────────────────────────────
+
+class SessionCreate(Schema):
+    date: datetime.date
+    notes: Optional[str] = None
+    souls_count: int = 0
+    duration_minutes: Optional[int] = None
+
+
+class SessionOut(BaseOut):
+    mission_id: int
+    date: datetime.date
+    notes: Optional[str] = None
+    souls_count: int
+    duration_minutes: Optional[int] = None
+
+
+# ─── Rhythm Period Schemas ─────────────────────────────────────────────────────
+
+class RhythmPeriodOut(Schema):
+    """A single period in the rhythm timeline."""
+    index: int
+    start: datetime.date
+    end: datetime.date
+    met: bool
+    met_at: Optional[str] = None  # ISO datetime string
+
+
+# ─── Personal Mission Output with Rhythm ───────────────────────────────────────
+
 class PersonalMissionOut(BaseOut):
     client_id: Optional[str] = None
     owner_id: int
@@ -49,3 +79,7 @@ class PersonalMissionOut(BaseOut):
     reminder_time: Optional[datetime.time] = None
     archived_at: Optional[str] = None
     what_happened: Optional[str] = None
+    # Rhythm tracking fields (computed)
+    rhythm_periods: List[RhythmPeriodOut] = []
+    met_count: int = 0
+    current_period_index: Optional[int] = None

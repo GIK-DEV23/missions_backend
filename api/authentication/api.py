@@ -55,11 +55,11 @@ def login(request, data: LoginRequest):
 
     Authenticates a user with email and password, returning tokens on success.
     """
-    email = data.email
+    email = data.email.lower().strip()
     password = data.password
 
-    # Authenticate using Django's built-in system
-    user = authenticate(email=email, password=password)
+    # Django's authenticate() uses 'username' kwarg even when USERNAME_FIELD='email'
+    user = authenticate(username=email, password=password)
 
     current_time = timezone.now()
     # Format current time as 'YYYY-MM-DD HH:MM:SS'
@@ -170,20 +170,29 @@ def social_auth(request, data: SocialAuthRequest):
 
 @router.post(
     "/refresh",
-    response={200: AuthResponse, 400: DetailOut},
-    auth=jwt_auth
+    response={200: AuthResponse, 400: DetailOut, 401: DetailOut},
 )
 def refresh_token(request, data: TokenRefreshIn):
-    """
-    Token refresh endpoint.
+    import logging
+    logger = logging.getLogger(__name__)
 
-    Expects an access token in the request body.
-    Validates the token and returns a new one with refreshed expiration.
-    """
     jwt_backend = get_backend('jwt')
     if not jwt_backend:
         raise HttpError(500, "JWT backend not available")
 
+    if not data.refresh_token and not data.access_token:
+        raise HttpError(400, "Either refresh_token or access_token is required")
+
+    if data.refresh_token:
+        valid, user, error = jwt_backend.validate_refresh_token(data.refresh_token)
+        if not valid:
+            raise HttpError(401, error)
+
+        jwt_backend.blacklist_refresh_token(data.refresh_token)
+        auth_data = get_auth_for_user(user)
+        return auth_data
+
+    logger.warning("Deprecated: refresh called with access_token instead of refresh_token")
     try:
         payload = jwt_backend.decode_token(data.access_token)
     except Exception:
@@ -223,9 +232,16 @@ def verify_token(request):
         "user": {
             "id": str(user.id),
             "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
             "display_name": user.get_display_name(),
             "is_superuser": user.is_superuser,
             "is_staff": user.is_staff,
+            "profile_photo": user.profile_photo.url if user.profile_photo else None,
+            "date_joined": user.date_joined.isoformat() if user.date_joined else None,
+            "phone_number": str(user.phone_number) if user.phone_number else None,
+            "bio": user.bio,
+            "church": user.church,
             "auth_provider": getattr(
                 user.get_primary_auth_provider(),
                 'provider.name',

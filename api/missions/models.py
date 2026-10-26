@@ -9,6 +9,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel, client_id_field
 from base.utils.exceptions import CustomValidationError
+from base.utils.image_validators import get_image_validators
 from missions.constants import LocationCategoryType, MissionStatusType, EventType, PaymentTiming
 from missions.schemas import AttendanceDayOut
 from users.constants import GenderType
@@ -104,7 +105,12 @@ class Mission(BaseModel):
     registration_fee_required = models.BooleanField(default=True)
     registration_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     couple_registration_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    banner_image = models.ImageField(upload_to=get_missions_banner_dir, null=True, blank=True)
+    banner_image = models.ImageField(
+        upload_to=get_missions_banner_dir,
+        null=True,
+        blank=True,
+        validators=get_image_validators(),
+    )
 
     def __str__(self):
         return self.title
@@ -137,7 +143,8 @@ class Mission(BaseModel):
             "is_registration_open": self.is_registration_open,
             "total_souls_won": commas(self.total_souls_won, use_decimal=False),
             "total_souls_follow_up": commas(self.total_souls_follow_up, use_decimal=False),
-            "banner_image": request.build_absolute_uri(self.banner_image.url) if request and self.banner_image else None
+            "banner_image": request.build_absolute_uri(self.banner_image.url) if request and self.banner_image else None,
+            "participants_count": self.participants.filter(is_archived=False).count(),
         })
         return data
 
@@ -214,7 +221,10 @@ class Report(BaseModel):
 class MissionGallery(BaseModel):
     mission = models.ForeignKey(Mission, on_delete=models.PROTECT, related_name='galleries')
     title = models.CharField(max_length=200, null=True, blank=True)
-    image = models.ImageField(upload_to=get_gallery_dir)
+    image = models.ImageField(
+        upload_to=get_gallery_dir,
+        validators=get_image_validators(),
+    )
     description = models.TextField(blank=True, null=True)
     uploaded_by = models.ForeignKey('users.User', related_name='uploaded_images', on_delete=models.SET_NULL, null=True)
 

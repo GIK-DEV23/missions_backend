@@ -4,14 +4,94 @@
 3. Get progress updates by id
 4. List progress updates with filters
 """
+from datetime import timedelta
 from enum import Enum
 from typing import Optional, Dict, Any
 
+from django.conf import settings
+from django.db.models import Q
+from django.utils import timezone
+
 from authentication.permissions import has_role_type
-from base.utils.exceptions import CustomValidationError
+from base.utils.exceptions import NotFoundError
 from base.utils.helpers import apply_sorting
+from souls.constants import FollowUpHealth
 from souls.filters import SoulFilter
 from souls.models import Soul, ProgressUpdate
+from users.constants import AgeGroupCategory
+
+
+# Age groups that require guardian consent
+MINOR_AGE_GROUPS = {AgeGroupCategory.CHILD, AgeGroupCategory.YOUNG_TEEN}
+
+
+def compute_follow_up_health(soul: Soul) -> Optional[str]:
+    if soul.do_not_contact:
+        return None
+
+    reference_date = soul.last_contacted_at or soul.date_added
+    if reference_date is None:
+        return None
+
+    if hasattr(reference_date, 'date'):
+        reference_date = reference_date.date()
+
+    days_since = (timezone.now().date() - reference_date).days
+
+    due_days = getattr(settings, 'SOUL_FOLLOWUP_DUE_DAYS', 7)
+    overdue_days = getattr(settings, 'SOUL_FOLLOWUP_OVERDUE_DAYS', 14)
+    dormant_days = getattr(settings, 'SOUL_FOLLOWUP_DORMANT_DAYS', 60)
+
+    if days_since >= dormant_days:
+        return FollowUpHealth.DORMANT
+    elif days_since >= overdue_days:
+        return FollowUpHealth.OVERDUE
+    elif days_since >= due_days:
+        return FollowUpHealth.DUE
+    return FollowUpHealth.HEALTHY
+
+
+def filter_by_follow_up_health(queryset, health: FollowUpHealth):
+    today = timezone.now().date()
+    due_days = getattr(settings, 'SOUL_FOLLOWUP_DUE_DAYS', 7)
+    overdue_days = getattr(settings, 'SOUL_FOLLOWUP_OVERDUE_DAYS', 14)
+    dormant_days = getattr(settings, 'SOUL_FOLLOWUP_DORMANT_DAYS', 60)
+
+    due_threshold = today - timedelta(days=due_days)
+    overdue_threshold = today - timedelta(days=overdue_days)
+    dormant_threshold = today - timedelta(days=dormant_days)
+
+    base_filter = Q(do_not_contact=False)
+
+    if health == FollowUpHealth.HEALTHY:
+        return queryset.filter(
+            base_filter,
+            Q(last_contacted_at__date__gt=due_threshold) | 
+            Q(last_contacted_at__isnull=True, date_added__gt=due_threshold)
+        )
+    elif health == FollowUpHealth.DUE:
+        return queryset.filter(
+            base_filter,
+            (
+                Q(last_contacted_at__date__lte=due_threshold, last_contacted_at__date__gt=overdue_threshold) |
+                Q(last_contacted_at__isnull=True, date_added__lte=due_threshold, date_added__gt=overdue_threshold)
+            )
+        )
+    elif health == FollowUpHealth.OVERDUE:
+        return queryset.filter(
+            base_filter,
+            (
+                Q(last_contacted_at__date__lte=overdue_threshold, last_contacted_at__date__gt=dormant_threshold) |
+                Q(last_contacted_at__isnull=True, date_added__lte=overdue_threshold, date_added__gt=dormant_threshold)
+            )
+        )
+    elif health == FollowUpHealth.DORMANT:
+        return queryset.filter(
+            base_filter,
+            Q(last_contacted_at__date__lte=dormant_threshold) |
+            Q(last_contacted_at__isnull=True, date_added__lte=dormant_threshold)
+        )
+    return queryset
 
 
 def get_soul(soul_id: int):
@@ -20,7 +100,7 @@ def get_soul(soul_id: int):
     try:
         return Soul.objects.get(id=soul_id, deleted_at__isnull=True)
     except Soul.DoesNotExist:
-        raise CustomValidationError("Soul with ID {} does not exist".format(soul_id))
+        raise NotFoundError("Soul with ID {} does not exist".format(soul_id))
 
 
 def get_soul_by_client_id(client_id):
@@ -29,14 +109,16 @@ def get_soul_by_client_id(client_id):
     try:
         return Soul.objects.get(client_id=client_id, deleted_at__isnull=True)
     except Soul.DoesNotExist:
-        raise CustomValidationError("Soul with client_id {} does not exist".format(client_id))
+        raise NotFoundError("Soul with client_id {} does not exist".format(client_id))
 
 
 def list_souls(
     user,
     filters: Optional[Dict[str, Any]] = None,
     sort_by: Optional[str] = None,
-    is_desc: bool = True
+    is_desc: bool = True,
+    follow_up_health: Optional[FollowUpHealth] = None,
+    minors_without_consent: bool = False,
 ):
     """List souls with optional filters."""
     if sort_by is None:
@@ -44,7 +126,14 @@ def list_souls(
     if isinstance(sort_by, Enum):
         sort_by = sort_by.value
     qs = Soul.objects.filter(deleted_at__isnull=True)
-    is_special_user = has_role_type("admin", user=user) or has_role_type("superadmin", user=user) or has_role_type("staff", user=user) or has_role_type("executive", user=user)
+    # Superusers and users with admin/staff/executive roles can see all souls
+    is_special_user = (
+        user.is_superuser or
+        has_role_type("admin", user=user) or
+        has_role_type("superadmin", user=user) or
+        has_role_type("staff", user=user) or
+        has_role_type("executive", user=user)
+    )
     if not is_special_user:
         qs = qs.filter(user=user)
     qs = apply_sorting(
@@ -55,6 +144,14 @@ def list_souls(
     )
     if filters:
         qs = SoulFilter(filters, queryset=qs).qs
+    if follow_up_health:
+        qs = filter_by_follow_up_health(qs, follow_up_health)
+    # BR-4: filter minors without guardian consent for compliance reporting
+    if minors_without_consent:
+        qs = qs.filter(
+            age_group__in=[ag.value for ag in MINOR_AGE_GROUPS],
+            guardian_consent_given=False,
+        )
     return qs
 
 
@@ -92,7 +189,13 @@ def get_progress_update(id: int):
     try:
         return ProgressUpdate.objects.get(id=id)
     except ProgressUpdate.DoesNotExist:
-        raise CustomValidationError("ProgressUpdate with ID {} does not exist".format(id))
+        raise NotFoundError("ProgressUpdate with ID {} does not exist".format(id))
+
+
+def get_soul_activity(soul_id: int):
+    """Get all progress updates for a soul, ordered by most recent first."""
+    soul = get_soul(soul_id)
+    return soul.progress_updates.all().order_by('-update_date', '-created_at')
 
 
 def list_progress_updates(
@@ -110,3 +213,16 @@ def list_progress_updates(
     if soul_id is not None:
         qs = qs.filter(soul=soul_id)
     return qs
+
+
+def get_soul_assignment(assignment_id: int):
+    from souls.models import SoulAssignment
+    try:
+        return SoulAssignment.objects.get(id=assignment_id)
+    except SoulAssignment.DoesNotExist:
+        raise NotFoundError("SoulAssignment with ID {} does not exist".format(assignment_id))
+
+
+def list_soul_assignments(soul_id: int):
+    from souls.models import SoulAssignment
+    return SoulAssignment.objects.filter(soul_id=soul_id).order_by('-is_active', '-created_at')

@@ -11,6 +11,18 @@ class CustomValidationError(ValidationError):
         super().__init__(errors)  # type: ignore
 
 
+class NotFoundError(Exception):
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
+class ForbiddenError(Exception):
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
+
+
 def parse_integrity_error(error: IntegrityError) -> str:
     message = str(error)
 

@@ -32,7 +32,7 @@ class ManualRegisterRequest(Schema):
     """Schema for user manual registration."""
     email: EmailStr
     first_name: str
-    last_name: str
+    last_name: Optional[str] = ''
     preferred_username: Optional[str] = None
     profile_photo: Optional[str] = None
     password: str
@@ -50,11 +50,16 @@ class UserData(Schema):
     is_superuser: bool = False
     is_staff: bool = False
     profile_photo: Optional[str] = None
+    date_joined: Optional[str] = None
+    phone_number: Optional[str] = None
+    bio: Optional[str] = None
+    church: Optional[str] = None
 
 
 class AuthResponse(Schema):
     """Schema for successful authentication responses."""
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str
     expires_in: int
     user: UserData
@@ -86,8 +91,8 @@ class AuthProviderListResponse(Schema):
 
 
 class TokenRefreshIn(Schema):
-    """Schema for token refresh requests."""
-    access_token: str = Field(..., description="The refresh token to obtain a new access token.")
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
 
 
 class RequestPasswordResetIn(Schema):

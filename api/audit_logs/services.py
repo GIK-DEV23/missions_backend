@@ -1,6 +1,7 @@
 from django.core.cache import cache
 
 from audit_logs.models import AuditLog
+from audit_logs.constants import ActionType, ContentType
 from audit_logs.selectors import audit_log_details
 
 
@@ -31,6 +32,71 @@ def log_audit_event(user, action_type, action_category, action_description, is_s
         is_successful=is_successful,
         ip_address=ip_address,
         flag_suspicious=flag_suspicious
+    )
+    return audit_log
+
+
+def log_moderation_action(
+    user,
+    action_type: str,
+    content_type: str,
+    content_id: int,
+    content_title: str,
+    previous_status: str = None,
+    new_status: str = None,
+    rejection_reason: str = None,
+    details: str = None,
+    ip_address=None
+):
+    """
+    Create a moderation audit log entry.
+
+    Args:
+        user: User instance performing the moderation action.
+        action_type: ActionType.APPROVE, ActionType.REJECT, ActionType.FEATURE, etc.
+        content_type: ContentType.TESTIMONY, ContentType.MIRACLE.
+        content_id: ID of the content being moderated.
+        content_title: Title of the content (for description).
+        previous_status: Review status before this action (optional).
+        new_status: Review status after this action (optional).
+        rejection_reason: Optional reason for rejection.
+        details: Optional additional details about the action.
+        ip_address: Optional IP address.
+
+    Returns:
+        The created AuditLog instance.
+    """
+    if ip_address is None:
+        ip_address = cache.get("user_ip_{}".format(user.id))
+
+    # Build description based on action type
+    action_verb_map = {
+        ActionType.APPROVE: "approved",
+        ActionType.REJECT: "rejected",
+        ActionType.FEATURE: "featured",
+        ActionType.UNFEATURE: "unfeatured",
+        ActionType.REORDER: "reordered",
+    }
+    action_verb = action_verb_map.get(action_type, action_type)
+    description = f"{action_verb.capitalize()} {content_type} #{content_id}: {content_title[:50]}"
+    if rejection_reason:
+        description = f"{description} - Reason: {rejection_reason[:100]}"
+    if details:
+        description = f"{description} - {details}"
+
+    audit_log = AuditLog.objects.create(
+        user=user,
+        action_type=action_type,
+        action_category="moderation",
+        action_description=description,
+        is_successful=True,
+        ip_address=ip_address,
+        flag_suspicious=False,
+        content_type=content_type,
+        content_id=content_id,
+        previous_status=previous_status,
+        new_status=new_status,
+        rejection_reason=rejection_reason
     )
     return audit_log
 

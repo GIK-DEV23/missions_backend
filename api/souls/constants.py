@@ -16,6 +16,13 @@ class ContactOutcome(TextChoices):
     NOT_YET = "not_yet", _("Not yet")
 
 
+class FollowUpHealth(TextChoices):
+    HEALTHY = "healthy", _("Healthy")
+    DUE = "due", _("Due")
+    OVERDUE = "overdue", _("Overdue")
+    DORMANT = "dormant", _("Dormant")
+
+
 class ProgressUpdateType(TextChoices):
     CALL = "call", _("Call")
     WHATSAPP = "whatsapp", _("WhatsApp")
@@ -28,3 +35,10 @@ class ProgressUpdateOutcome(TextChoices):
     REACHED = "reached", _("Reached")
     NO_ANSWER = "no_answer", _("No answer")
     RESCHEDULED = "rescheduled", _("Rescheduled")
+
+
+class GuardianRelationship(TextChoices):
+    """Guardian relationship types for minor safeguarding."""
+    PARENT = "parent", _("Parent")
+    LEGAL_GUARDIAN = "legal_guardian", _("Legal Guardian")
+    OTHER = "other", _("Other")

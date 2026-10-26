@@ -6,6 +6,7 @@ from django.http import HttpRequest
 from django.utils import timezone
 
 from base.models import BaseModel, client_id_field
+from base.utils.image_validators import get_image_validators
 from testimonies.constants import SubmissionVisibility, ReviewStatus
 
 
@@ -91,10 +92,20 @@ class Testimony(BaseModel):
         null=True,
         blank=True,
         help_text="Optional photo associated with the testimony",
+        validators=get_image_validators(),
     )
     is_selected = models.BooleanField(
         default=False,
         help_text="Indicates whether the testimony has been selected for publication",
+    )
+    featured_until = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this testimony should stop being featured. Null = indefinitely featured (if is_selected=True)",
+    )
+    feature_order = models.PositiveIntegerField(
+        default=0,
+        help_text="Display order for featured testimonies. Lower = higher priority.",
     )
     visibility = models.CharField(max_length=20, choices=SubmissionVisibility.choices, default=SubmissionVisibility.PUBLIC)
     review_status = models.CharField(max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING)
@@ -107,7 +118,9 @@ class Testimony(BaseModel):
         ordering = ["-created_at"]
 
     def __str__(self):
-        return f"Testimony by {self.soul} - {self.title}"
+        # Testimony is always by the user who submitted it
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Testimony by {author} - {self.title}"
 
     def to_dict(self, request: HttpRequest = None) -> Dict[str, Any]:
         data = super().to_dict()
@@ -120,6 +133,8 @@ class Testimony(BaseModel):
             "mission_title": self.mission.title if self.mission else None,
             "personal_mission_id": self.personal_mission.id if self.personal_mission else None,
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
+            "featured_until": self.featured_until.isoformat() if self.featured_until else None,
+            "feature_order": self.feature_order,
         })
         return data
 
@@ -134,10 +149,11 @@ class Miracle(BaseModel):
         help_text="Content of the miracle",
     )
     photo = models.ImageField(
-        upload_to=get_testimonies_dir,
+        upload_to=get_miracles_dir,
         null=True,
         blank=True,
         help_text="Optional photo associated with the miracle",
+        validators=get_image_validators(),
     )
     soul = models.ForeignKey(
         "souls.Soul",
@@ -182,7 +198,8 @@ class Miracle(BaseModel):
     third_party_consent = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Miracle by {self.soul} - {self.title}"
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Miracle by {author} - {self.title}"
 
     class Meta:
         verbose_name = "Miracle"
@@ -209,7 +226,13 @@ class Highlight(BaseModel):
     client_id = client_id_field()
     title = models.CharField(max_length=255, help_text="Title of the highlight")
     content = models.TextField(help_text="Content of the highlight")
-    photo = models.ImageField(upload_to=get_highlights_dir, null=True, blank=True, help_text="Optional photo associated with the highlight")
+    photo = models.ImageField(
+        upload_to=get_highlights_dir,
+        null=True,
+        blank=True,
+        help_text="Optional photo associated with the highlight",
+        validators=get_image_validators(),
+    )
     soul = models.ForeignKey(
         "souls.Soul",
         on_delete=models.CASCADE,
@@ -249,7 +272,8 @@ class Highlight(BaseModel):
     third_party_consent = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"Highlight by {self.soul} - {self.title}"
+        author = self.user.get_full_name() if self.user else "Anonymous"
+        return f"Highlight by {author} - {self.title}"
 
     class Meta:
         verbose_name = "Highlight"
@@ -269,3 +293,16 @@ class Highlight(BaseModel):
             "photo_url": request.build_absolute_uri(self.photo.url) if self.photo and request else None,
         })
         return data
+
+
+class AnonymousSubmissionToken(models.Model):
+    device_token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    submission_count = models.PositiveIntegerField(default=0)
+    window_start = models.DateTimeField(auto_now_add=True)
+    last_submission_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "anonymous_submission_tokens"
+
+    def __str__(self):
+        return "AnonymousToken {} ({} submissions)".format(self.device_token_hash[:8], self.submission_count)

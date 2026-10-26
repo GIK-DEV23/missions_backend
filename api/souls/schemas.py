@@ -6,7 +6,7 @@ from typing import Optional
 from ninja import Schema
 
 from base.schemas import BaseQuery, FilterQuery, BaseOut
-from souls.constants import JourneyStage, ContactOutcome, ProgressUpdateType, ProgressUpdateOutcome
+from souls.constants import JourneyStage, ContactOutcome, FollowUpHealth, ProgressUpdateType, ProgressUpdateOutcome, GuardianRelationship
 from users.constants import GenderType, AgeGroupCategory
 
 
@@ -24,6 +24,8 @@ class SoulsListByEnum(str, Enum):
     FIRST_NAME = 'first_name'
     PHONE_NUMBER = 'phone_number'
     DATE_ADDED = 'date_added'
+    NEXT_CHECK_IN_AT = 'next_check_in_at'
+    LAST_CONTACTED_AT = 'last_contacted_at'
 
 
 class SoulsQuery(BaseQuery):
@@ -34,19 +36,24 @@ class SoulsQuery(BaseQuery):
     age_group: Optional[AgeGroupCategory] = None
     location: Optional[int] = None
     status: Optional[JourneyStage] = None
+    follow_up_health: Optional[FollowUpHealth] = None
     search: Optional[str] = None
     created_before: Optional[datetime.date] = None
     created_after: Optional[datetime.date] = None
     user: Optional[int] = None
     sort_by: Optional[SoulsListByEnum] = None
     is_desc: Optional[bool] = True
+    minors_without_consent: Optional[bool] = None  # BR-4: filter for compliance report
 
 
 class SoulCreate(Schema):
-    """Schema for creating a soul."""
+    """Schema for creating a soul.
+
+    Accepts a single ``full_name`` (split server-side into first/last name),
+    matching the mobile app's single name field.
+    """
     client_id: Optional[uuid.UUID] = None
-    first_name: str
-    last_name: str
+    full_name: str
     phone_number: str
     gender: GenderType
     age_group: AgeGroupCategory
@@ -56,6 +63,7 @@ class SoulCreate(Schema):
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     personal_mission: Optional[int] = None
+    personal_mission_client_id: Optional[uuid.UUID] = None
     is_personal: bool = False
     user: Optional[int] = None
     description: Optional[str] = None
@@ -63,6 +71,12 @@ class SoulCreate(Schema):
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: bool = False
     do_not_contact_at: Optional[datetime.datetime] = None
+    # Guardian consent fields for minors (age_group in {0-12, 13-17})
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[GuardianRelationship] = None
+    guardian_consent_given: bool = False
+    guardian_consent_date: Optional[datetime.datetime] = None
+    guardian_phone: Optional[str] = None
 
 
 class SoulUpdate(Schema):
@@ -78,13 +92,20 @@ class SoulUpdate(Schema):
     date_added: Optional[datetime.date] = None
     mission: Optional[int] = None
     personal_mission: Optional[int] = None
-    is_personal: bool = False
+    personal_mission_client_id: Optional[uuid.UUID] = None
+    is_personal: Optional[bool] = None
     user: Optional[int] = None
     description: Optional[str] = None
     consent_given: Optional[bool] = None
     consent_recorded_at: Optional[datetime.datetime] = None
     do_not_contact: Optional[bool] = None
     do_not_contact_at: Optional[datetime.datetime] = None
+    # Guardian consent fields for minors
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[GuardianRelationship] = None
+    guardian_consent_given: Optional[bool] = None
+    guardian_consent_date: Optional[datetime.datetime] = None
+    guardian_phone: Optional[str] = None
 
 class ProgressUpdateSummary(BaseOut):
     """Schema for progress update output."""
@@ -103,6 +124,7 @@ class SoulOut(BaseOut):
     first_name: str
     last_name: str
     phone_number: str
+    phone_number_masked: bool = False  # Indicates if phone_number is masked
     gender: str
     age_group: str
     location_id: Optional[int] = None
@@ -113,6 +135,7 @@ class SoulOut(BaseOut):
     mission_id: Optional[int] = None
     mission_title: Optional[str] = None
     personal_mission_id: Optional[int] = None
+    personal_mission_client_id: Optional[str] = None
     is_personal: bool = False
     user_id: Optional[int] = None
     user_full_name: Optional[str] = None
@@ -120,11 +143,25 @@ class SoulOut(BaseOut):
     description: Optional[str] = None
     next_check_in_at: Optional[str] = None
     last_contacted_at: Optional[str] = None
+    follow_up_health: Optional[str] = None
     consent_given: bool = False
     consent_recorded_at: Optional[str] = None
     do_not_contact: bool = False
     do_not_contact_at: Optional[str] = None
     possible_duplicate_of: Optional[int] = None
+    # Guardian consent fields for minors
+    guardian_name: Optional[str] = None
+    guardian_relationship: Optional[str] = None
+    guardian_consent_given: bool = False
+    guardian_consent_date: Optional[str] = None
+    guardian_phone: Optional[str] = None
+
+
+class PhoneRevealOut(Schema):
+    """Schema for revealing unmasked phone numbers."""
+    soul_id: int
+    phone_number: Optional[str] = None
+    guardian_phone: Optional[str] = None
 
 
 class SoulMergeIn(Schema):
@@ -169,3 +206,25 @@ class ProgressUpdateQuery(BaseQuery):
     """Schema for querying progress updates with pagination."""
     soul_id: Optional[int] = None
     is_desc: Optional[bool] = True
+
+
+class SoulAssignmentOut(BaseOut):
+    soul_id: int
+    soul_full_name: str
+    user_id: int
+    user_full_name: str
+    assigned_by_id: Optional[int] = None
+    assigned_by_full_name: Optional[str] = None
+    is_active: bool
+    notes: str
+
+
+class SoulAssignmentCreate(Schema):
+    soul_id: int
+    user_id: int
+    notes: Optional[str] = ""
+
+
+class SoulAssignmentUpdate(Schema):
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None

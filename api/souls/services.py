@@ -10,14 +10,17 @@ from typing import Optional
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import Http404
 from django.utils import timezone
+from ninja.errors import HttpError
 
 from audit_logs.constants import ActionType
 from audit_logs.services import log_audit_event
-from base.utils.exceptions import CustomValidationError, handle_cleaning_error
+from base.utils.exceptions import CustomValidationError, ForbiddenError, handle_cleaning_error
 from base.utils.file_parser import FileParser
-from base.utils.helpers import validate_date, resolve_fk_by_client_id
+from base.utils.helpers import validate_date, resolve_fk_by_client_id, normalize_kenyan_phone
 from missions.selectors import location_details, mission_details
+from personal_missions.models import PersonalMission
 from personal_missions.selectors import personal_mission_details
 from souls.models import Soul, ProgressUpdate
 from souls.selectors import get_soul, get_soul_by_client_id
@@ -33,6 +36,48 @@ FK_RESOLVERS = {
 }
 
 
+def _resolve_personal_mission(user, data: dict):
+    """Resolve `personal_mission` FK from either an int id or a client UUID.
+
+    Pops `personal_mission_client_id` from *data* (never stored on the model
+    directly).  Rules:
+    - `personal_mission` (int) present → use directly, skip UUID lookup.
+    - `personal_mission_client_id` (UUID) present, no int → look up by
+      (owner, client_id).  Found → set `personal_mission`; not found → 409
+      so the client retries after the mission syncs.
+    - Neither present → no-op.
+    """
+    client_id = data.pop("personal_mission_client_id", None)
+
+    # If the int FK is already present, it wins; UUID is only a fallback.
+    if data.get("personal_mission") is not None:
+        if client_id is not None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Soul create/update: both personal_mission (int) and "
+                "personal_mission_client_id supplied; using int."
+            )
+        return  # FK_RESOLVERS will handle the int lookup as usual
+
+    if client_id is None:
+        return  # no mission link requested
+
+    try:
+        pm = PersonalMission.objects.get(client_id=client_id, owner=user)
+        data["personal_mission"] = pm.id
+    except PersonalMission.DoesNotExist:
+        raise HttpError(
+            409,
+            {
+                "code": "MISSION_NOT_SYNCED",
+                "detail": (
+                    "Personal mission with client_id={} not found on server yet. "
+                    "Sync the mission first, then retry."
+                ).format(client_id),
+            },
+        )
+
+
 def _find_possible_duplicate(phone_number, exclude_id=None) -> Optional[int]:
     qs = Soul.objects.filter(phone_number=phone_number, deleted_at__isnull=True)
     if exclude_id is not None:
@@ -46,22 +91,134 @@ def _stamp_consent_and_contact_fields(data: dict, existing_consent_recorded_at=N
         data["consent_recorded_at"] = timezone.now()
     if data.get("do_not_contact") and not data.get("do_not_contact_at") and not existing_do_not_contact_at:
         data["do_not_contact_at"] = timezone.now()
+    # Auto-stamp guardian_consent_date when guardian_consent_given flips to True
+    if data.get("guardian_consent_given") and not data.get("guardian_consent_date"):
+        data["guardian_consent_date"] = timezone.now()
 
 
-def create_soul(data) -> Soul:
+# Age groups that require guardian consent (minors: 0-12 and 13-17)
+MINOR_AGE_GROUPS = {AgeGroupCategory.CHILD, AgeGroupCategory.YOUNG_TEEN}
+
+
+def _validate_guardian_consent_for_minor(data: dict, existing_soul=None):
+    """
+    Validate guardian consent fields for minors per BR-4.
+
+    For minors (age_group in {0-12, 13-17}), consent_given can only be accepted
+    as True when guardian_name, guardian_relationship, and guardian_consent_given
+    are all set.
+
+    On create: check data.
+    On update: merge data with existing soul fields.
+    """
+    # Determine the effective age_group (from data or existing soul)
+    age_group = data.get("age_group")
+    if age_group is None and existing_soul:
+        age_group = existing_soul.age_group
+    if age_group is None:
+        return  # Cannot validate without an age group
+
+    # Check if this is a minor
+    is_minor = age_group in MINOR_AGE_GROUPS or age_group in {ag.value for ag in MINOR_AGE_GROUPS}
+    if not is_minor:
+        return  # Not a minor, no guardian consent required
+
+    # Determine effective consent_given
+    consent_given = data.get("consent_given")
+    if consent_given is None and existing_soul:
+        consent_given = existing_soul.consent_given
+
+    if not consent_given:
+        return  # consent_given is False/None, validation passes (no claim of consent)
+
+    # consent_given is True for a minor -- require guardian fields
+    guardian_name = data.get("guardian_name")
+    if guardian_name is None and existing_soul:
+        guardian_name = existing_soul.guardian_name
+
+    guardian_relationship = data.get("guardian_relationship")
+    if guardian_relationship is None and existing_soul:
+        guardian_relationship = existing_soul.guardian_relationship
+
+    guardian_consent_given = data.get("guardian_consent_given")
+    if guardian_consent_given is None and existing_soul:
+        guardian_consent_given = existing_soul.guardian_consent_given
+
+    missing = []
+    if not guardian_name:
+        missing.append("guardian_name")
+    if not guardian_relationship:
+        missing.append("guardian_relationship")
+    if not guardian_consent_given:
+        missing.append("guardian_consent_given")
+
+    if missing:
+        raise CustomValidationError(
+            "For minors (age 0-17), consent_given requires guardian information: {}".format(", ".join(missing))
+        )
+
+
+def _split_full_name(full_name: str) -> tuple[str, str]:
+    """Split a single full name into (first_name, last_name).
+
+    The first whitespace-separated token is the first name; the remainder is
+    the last name. A single-word name is allowed — the last name is left blank.
+    Only a completely empty name is rejected.
+    """
+    parts = (full_name or "").strip().split()
+    if not parts:
+        raise CustomValidationError("full_name: Please enter a name.")
+    if len(parts) == 1:
+        return parts[0], ""
+    return parts[0], " ".join(parts[1:])
+
+
+def create_soul(user, data) -> Soul:
     try:
+        # Idempotency: if a soul with this client_id already exists, return it.
+        client_id = data.get("client_id")
+        if client_id is not None:
+            existing = Soul.objects.filter(client_id=client_id, deleted_at__isnull=True).first()
+            if existing is not None:
+                return existing
+
+        # Accept a single full_name and split it into the model's first/last.
+        if "full_name" in data:
+            first_name, last_name = _split_full_name(data.pop("full_name"))
+            data["first_name"] = first_name
+            data["last_name"] = last_name
+        # Normalize the phone to canonical E.164 (+254…), accepting the common
+        # local formats (07…, 01…, 254…, +254…).
+        if data.get("phone_number"):
+            data["phone_number"] = normalize_kenyan_phone(data["phone_number"])
+        # Resolve personal_mission_client_id → personal_mission int FK before
+        # the generic FK_RESOLVERS loop runs (which expects ints).
+        _resolve_personal_mission(user, data)
         for key, resolver in FK_RESOLVERS.items():
             if data.get(key) is not None:
                 data[key] = resolver(data[key])
         _stamp_consent_and_contact_fields(data)
+        _validate_guardian_consent_for_minor(data)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"])
-        soul = Soul(**data)
-        soul.full_clean()
-        soul.save()
+        
+        with transaction.atomic():
+            soul = Soul(**data)
+            soul.full_clean()
+            soul.save()
+            
+            # Mark rhythm period as met if soul is linked to a personal mission
+            if soul.personal_mission:
+                from personal_missions.services import mark_period_met
+                mark_period_met(soul.personal_mission, soul.date_added)
+                
+    except HttpError:
+        raise
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
+    except CustomValidationError:
+        raise
     except Exception as e:
         raise CustomValidationError("Error creating soul: {}".format(e))
     return soul
@@ -74,8 +231,12 @@ def update_soul(user, soul_id, data) -> Soul:
         if soul.contact_outcome and new_contact_outcome and new_contact_outcome != soul.contact_outcome:
             raise CustomValidationError("contact_outcome is immutable once set")
         _stamp_consent_and_contact_fields(data, soul.consent_recorded_at, soul.do_not_contact_at)
+        _validate_guardian_consent_for_minor(data, existing_soul=soul)
         if data.get("phone_number"):
             data["possible_duplicate_of_id"] = _find_possible_duplicate(data["phone_number"], exclude_id=soul.id)
+        # Resolve personal_mission_client_id → personal_mission int FK before
+        # the generic FK_RESOLVERS loop runs.
+        _resolve_personal_mission(user, data)
         original_fields = {field: getattr(soul, field) for field in data.keys()}
         for key, value in data.items():
             if value is not None:
@@ -95,6 +256,8 @@ def update_soul(user, soul_id, data) -> Soul:
                 action_description=log_message,
                 is_successful=True
             )
+    except HttpError:
+        raise
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -160,15 +323,22 @@ def create_progress_update(data: dict) -> ProgressUpdate:
         data["author"] = user_details(author_id)
     next_check_in_at = data.get("next_check_in_at")
     try:
-        progress_update = ProgressUpdate(soul=soul, **data)
-        progress_update.full_clean()
-        progress_update.save()
-        soul_update_fields = ["last_contacted_at"]
-        soul.last_contacted_at = progress_update.created_at
-        if next_check_in_at:
-            soul.next_check_in_at = next_check_in_at
-            soul_update_fields.append("next_check_in_at")
-        soul.save(update_fields=soul_update_fields)
+        with transaction.atomic():
+            progress_update = ProgressUpdate(soul=soul, **data)
+            progress_update.full_clean()
+            progress_update.save()
+            soul_update_fields = ["last_contacted_at"]
+            soul.last_contacted_at = progress_update.created_at
+            if next_check_in_at:
+                soul.next_check_in_at = next_check_in_at
+                soul_update_fields.append("next_check_in_at")
+            soul.save(update_fields=soul_update_fields)
+            
+            # Mark rhythm period as met if soul belongs to a personal mission
+            if soul.personal_mission:
+                from personal_missions.services import mark_period_met
+                mark_period_met(soul.personal_mission, progress_update.update_date)
+                
     except ValidationError as e:
         error_message = handle_cleaning_error(e)
         raise CustomValidationError(error_message)
@@ -327,7 +497,7 @@ def progress_update_handler(user, kwargs):
     else:
         return None
     if not soul.user or soul.user.pk != user.pk:
-        raise CustomValidationError("You can only view/write/edit/delete notes for souls assigned to you.")
+        raise ForbiddenError("You can only view/write/edit/delete notes for souls assigned to you.")
     return None
 
 
@@ -344,4 +514,43 @@ def missioner_soul_operations_handler(user, kwargs):
     soul = get_soul(soul_id=soul_id)
 
     if not soul.user or soul.user.pk != user.id:
-        raise CustomValidationError("You can only view/update souls assigned to you.")
+        raise ForbiddenError("You can only view/update souls assigned to you.")
+
+
+def create_soul_assignment(user, data: dict):
+    from souls.models import SoulAssignment
+    from souls.selectors import get_soul
+    
+    soul = get_soul(data["soul_id"])
+    assignee = user_details(data["user_id"])
+    
+    try:
+        assignment = SoulAssignment(
+            soul=soul,
+            user=assignee,
+            assigned_by=user,
+            notes=data.get("notes", "")
+        )
+        assignment.full_clean()
+        assignment.save()
+    except ValidationError as e:
+        error_message = handle_cleaning_error(e)
+        raise CustomValidationError(error_message)
+    return assignment
+
+
+def update_soul_assignment(assignment_id: int, data: dict):
+    from souls.selectors import get_soul_assignment
+    
+    assignment = get_soul_assignment(assignment_id)
+    
+    try:
+        for key, value in data.items():
+            if value is not None:
+                setattr(assignment, key, value)
+        assignment.full_clean()
+        assignment.save()
+    except ValidationError as e:
+        error_message = handle_cleaning_error(e)
+        raise CustomValidationError(error_message)
+    return assignment

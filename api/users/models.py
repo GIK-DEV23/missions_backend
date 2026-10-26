@@ -9,7 +9,8 @@ from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
 from base.models import BaseModel
-from users.constants import AuthProviderType
+from base.utils.image_validators import get_image_validators
+from users.constants import AuthProviderType, GenderType
 from users.managers import UserManager
 
 
@@ -133,7 +134,7 @@ class User(AbstractUser, BaseModel):
 
     # Core fields (matching your schema)
     first_name = models.CharField(max_length=100)
-    last_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True, default='')
     email = models.EmailField(unique=True)
     phone_number = PhoneNumberField(null=True, blank=True)
     # Username fields
@@ -145,10 +146,18 @@ class User(AbstractUser, BaseModel):
     )
 
     # Additional fields
-    profile_photo = models.ImageField(upload_to=get_user_photos_dir, null=True, blank=True)
+    profile_photo = models.ImageField(
+        upload_to=get_user_photos_dir,
+        null=True,
+        blank=True,
+        validators=get_image_validators(),
+    )
     roles = models.ManyToManyField(Role, related_name='users', blank=True)
     church = models.CharField(max_length=200, null=True, blank=True)
     bio = models.TextField(null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=GenderType.choices, null=True, blank=True)
+    travelling_from = models.CharField(max_length=200, null=True, blank=True)
+    diet_advisory = models.TextField(null=True, blank=True)
     emergency_contact_name = models.CharField(max_length=100, null=True, blank=True)
     emergency_contact_phone = PhoneNumberField(null=True, blank=True)
     emergency_contact_confirmed_at = models.DateTimeField(null=True, blank=True)
@@ -156,7 +165,7 @@ class User(AbstractUser, BaseModel):
 
     # Use email as the unique identifier for authentication
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username', 'first_name', 'last_name']
+    REQUIRED_FIELDS = ['username', 'first_name']
 
     # Use custom manager
     objects = UserManager()
@@ -256,8 +265,13 @@ class User(AbstractUser, BaseModel):
         data = super().to_dict()
         data.update({
             "id": self.pk,
+            "preferred_username": self.preferred_username,
             "display_name": self.get_display_name(),
             "roles": list(self.roles.values_list('name', flat=True)),
+            "date_joined": self.date_joined.isoformat() if self.date_joined else None,
+            "phone_number": str(self.phone_number) if self.phone_number else None,
+            "bio": self.bio,
+            "church": self.church,
         })
         return data
 
